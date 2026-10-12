@@ -3,7 +3,6 @@ import pino from 'pino';
 import fs from 'fs';
 import { exec } from 'child_process';
 import readline from 'readline';
-import Sticker, { StickerTypes } from 'wa-sticker-formatter';
 
 const BOT_NAME = "Luna Bot";
 const BOT_OWNER = "Benjamin";
@@ -40,7 +39,6 @@ async function fetchActionGifUrl(action) {
 }
 
 async function connectToWhatsApp() {
-    // Carga o crea las credenciales guardadas en la carpeta auth_info_baileys
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
 
     const sock = makeWASocket({
@@ -50,7 +48,6 @@ async function connectToWhatsApp() {
         logger: pino({ level: 'silent' })
     });
 
-    // SOLO si NUNCA se ha registrado ni vinculado el número, pedirá el número de teléfono
     if (!sock.authState.creds.registered) {
         console.log('\n📱 Iniciando primera vinculación de sesión...');
         const phoneNumber = await question('👉 Ingresa tu número de WhatsApp con código de país (ejemplo: 573001234567): ');
@@ -74,11 +71,10 @@ async function connectToWhatsApp() {
         if (connection === 'close') {
             const statusCode = lastDisconnect?.error?.output?.statusCode;
             const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-            console.log(`⚠️ Conexión cerrada. Reconectando: ${shouldReconnect}`);
             if (shouldReconnect) {
                 connectToWhatsApp();
             } else {
-                console.log('❌ Sesión cerrada por WhatsApp. Borra la carpeta auth_info_baileys para volver a vincular.');
+                console.log('❌ Sesión cerrada por WhatsApp.');
             }
         } else if (connection === 'open') {
             console.log(`\n¡${BOT_NAME} está en línea y conectada permanentemente! ✅\n`);
@@ -179,15 +175,19 @@ async function connectToWhatsApp() {
                             { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage }
                         );
 
-                        const sticker = new Sticker(buffer, {
-                            pack: 'Luna Bot',
-                            author: 'Benjamin',
-                            type: StickerTypes.FULL,
-                            quality: 70
-                        });
+                        const tempIn = `./temp_${Date.now()}.bin`;
+                        const tempOut = `./temp_${Date.now()}.webp`;
+                        fs.writeFileSync(tempIn, buffer);
 
-                        const stickerBuffer = await sticker.toBuffer();
-                        await sock.sendMessage(from, { sticker: stickerBuffer }, { quoted: m });
+                        exec(`ffmpeg -i "${tempIn}" -vf "scale=512:512:force_original_aspect_ratio=increase,crop=512:512" -vcodec libwebp -lossless 1 -qscale:v 80 -an -vsync 0 "${tempOut}"`, async (err) => {
+                            if (!err && fs.existsSync(tempOut)) {
+                                await sock.sendMessage(from, { sticker: fs.readFileSync(tempOut) }, { quoted: m });
+                                fs.unlinkSync(tempOut);
+                            } else {
+                                await sock.sendMessage(from, { sticker: buffer }, { quoted: m });
+                            }
+                            if (fs.existsSync(tempIn)) fs.unlinkSync(tempIn);
+                        });
                     } catch (e) {
                         console.error("Error sticker:", e);
                         await sock.sendMessage(from, { text: '❌ Ocurrió un error al procesar el sticker.' }, { quoted: m });
