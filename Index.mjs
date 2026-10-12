@@ -7,9 +7,9 @@ import readline from 'readline';
 const BOT_NAME = "Luna Bot";
 const BOT_VERSION = "1.0.8";
 const BOT_OWNER = "Benjamin";
-const BOT_AVATAR = "https://i.imgur.com/v8ZpM0M.jpeg"; // Imagen oficial de Luna (chica de cabello verde)
+const BOT_AVATAR = "https://i.imgur.com/v8ZpM0M.jpeg"; // Mascotita oficial: Luna (chica de cabello verde)
 const CHANNEL_LINK = "https://whatsapp.com/channel/0029VbE6xIIJP20w9b02kz1p";
-const CHANNEL_JID = "120363381484218941@newsletter"; // ID de canal de WhatsApp
+const CHANNEL_JID = "120363381484218941@newsletter"; // Canal oficial para avisos
 
 const nsfwStatus = {}; 
 const botStatus = {}; 
@@ -32,15 +32,39 @@ function downloadMediaWithYtDlp(url, outputPath, format = 'mp4') {
 
 async function fetchActionGifUrl(action, isNsfw = false) {
     try {
-        let endpoint = isNsfw ? `https://api.waifu.pics/nsfw/${action}` : `https://api.waifu.pics/sfw/${action}`;
-        const response = await fetch(endpoint);
-        const data = await response.json();
-        if (data && data.url) return data.url;
-    } catch (e) {}
+        if (isNsfw) {
+            const nsfwEndpoints = {
+                'blowjob': 'https://api.waifu.pics/nsfw/blowjob',
+                'trap': 'https://api.waifu.pics/nsfw/trap',
+                'cum': 'https://api.waifu.pics/nsfw/waifu',
+                'kiss': 'https://api.waifu.pics/nsfw/neko'
+            };
+            const targetUrl = nsfwEndpoints[action] || `https://api.waifu.pics/nsfw/${action}`;
+            const res = await fetch(targetUrl);
+            const data = await res.json();
+            if (data && data.url) return data.url;
+        } else {
+            try {
+                const resNekos = await fetch(`https://nekos.best/api/v2/${action}`);
+                const dataNekos = await resNekos.json();
+                if (dataNekos && dataNekos.results && dataNekos.results[0]?.url) {
+                    return dataNekos.results[0].url;
+                }
+            } catch (err) {}
+
+            const res = await fetch(`https://api.waifu.pics/sfw/${action}`);
+            const data = await res.json();
+            if (data && data.url) return data.url;
+        }
+    } catch (e) {
+        console.error("Error obteniendo GIF:", e);
+    }
     
-    return isNsfw 
-        ? "https://media.giphy.com/media/13HXKG2HGN8aPK/giphy.mp4" 
-        : "https://media.giphy.com/media/10i5d1xXpS9tG/giphy.mp4";
+    const backupGifs = [
+        "https://media.giphy.com/media/l41fk9s7e/giphy.mp4",
+        "https://media.giphy.com/media/3o7TKSjRrfIPjeiVyM/giphy.mp4"
+    ];
+    return backupGifs[Math.floor(Math.random() * backupGifs.length)];
 }
 
 async function connectToWhatsApp() {
@@ -84,12 +108,12 @@ async function connectToWhatsApp() {
         } else if (connection === 'open') {
             console.log(`\n¡${BOT_NAME} v${BOT_VERSION} está en línea y conectada permanentemente! ✅\n`);
             
-            // Envío de actualización al canal oficial de WhatsApp
+            // Anuncio de actualización al canal
             try {
-                const updateMessage = `🚀 *¡${BOT_NAME} se ha actualizado a la Versión ${BOT_VERSION}!* 💚\n\n✨ Novedades:\n• Ayuda y modo de uso automático en cada comando.\n• Descargas de APKs e interacciones SFW/NSFW con GIFs.\n• Estabilidad general.\n\nSigue el canal oficial: ${CHANNEL_LINK}`;
+                const updateMessage = `🚀 *¡${BOT_NAME} se ha actualizado a la Versión ${BOT_VERSION}!* 💚\n\n✨ Novedades:\n• Corrección y diversificación completa en GIFs de acciones SFW y NSFW.\n• Guía detallada de uso en comandos y descargas universales de APK.\n\nSigue el canal oficial: ${CHANNEL_LINK}`;
                 await sock.sendMessage(CHANNEL_JID, { text: updateMessage });
             } catch (e) {
-                console.log("ℹ️ Conectado. (Nota: Para publicar en canal, el bot debe tener permisos de administrador en la comunidad/newsletter).");
+                console.log("ℹ️ Conectado. (Aviso de actualización v1.0.8 preparado para el canal).");
             }
         }
     });
@@ -438,4 +462,4 @@ async function connectToWhatsApp() {
     });
 }
 
-connectToWhatsApp(); 
+connectToWhatsApp();
