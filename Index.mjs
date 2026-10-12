@@ -5,9 +5,11 @@ import { exec } from 'child_process';
 import readline from 'readline';
 
 const BOT_NAME = "Luna Bot";
+const BOT_VERSION = "1.0.7";
 const BOT_OWNER = "Benjamin";
-const BOT_AVATAR = "https://i.imgur.com/v8ZpM0M.jpeg";
-const CHANNEL_LINK = "Sigue el canal de Luna BOT en WhatsApp: https://whatsapp.com/channel/0029VbE6xIIJP20w9b02kz1p";
+const BOT_AVATAR = "https://i.imgur.com/v8ZpM0M.jpeg"; // Chica anime de cabello verde (Luna)
+const CHANNEL_LINK = "https://whatsapp.com/channel/0029VbE6xIIJP20w9b02kz1p";
+const CHANNEL_JID = "120363381484218941@newsletter"; // Canal oficial para avisar actualizaciones (o ajusta según tu JID de canal)
 
 const nsfwStatus = {}; 
 const botStatus = {}; 
@@ -28,14 +30,18 @@ function downloadMediaWithYtDlp(url, outputPath, format = 'mp4') {
     });
 }
 
-async function fetchActionGifUrl(action) {
+async function fetchActionGifUrl(action, isNsfw = false) {
     try {
-        const response = await fetch(`https://api.waifu.pics/sfw/${action}`);
+        let endpoint = isNsfw ? `https://api.waifu.pics/nsfw/${action}` : `https://api.waifu.pics/sfw/${action}`;
+        const response = await fetch(endpoint);
         const data = await response.json();
-        return data.url;
-    } catch (e) {
-        return "https://media.giphy.com/media/10i5d1xXpS9tG/giphy.mp4";
-    }
+        if (data && data.url) return data.url;
+    } catch (e) {}
+    
+    // Fallback seguro en caso de fallo de API
+    return isNsfw 
+        ? "https://media.giphy.com/media/13HXKG2HGN8aPK/giphy.mp4" 
+        : "https://media.giphy.com/media/10i5d1xXpS9tG/giphy.mp4";
 }
 
 async function connectToWhatsApp() {
@@ -66,7 +72,7 @@ async function connectToWhatsApp() {
         console.log('\n🔄 Sesión previa detectada. Conectando a WhatsApp directamente...');
     }
 
-    sock.ev.on('connection.update', (update) => {
+    sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect } = update;
         if (connection === 'close') {
             const statusCode = lastDisconnect?.error?.output?.statusCode;
@@ -77,7 +83,15 @@ async function connectToWhatsApp() {
                 console.log('❌ Sesión cerrada por WhatsApp.');
             }
         } else if (connection === 'open') {
-            console.log(`\n¡${BOT_NAME} está en línea y conectada permanentemente! ✅\n`);
+            console.log(`\n¡${BOT_NAME} v${BOT_VERSION} está en línea y conectada permanentemente! ✅\n`);
+            
+            // Envío automático de actualización al canal oficial
+            try {
+                const updateMessage = `🚀 *¡${BOT_NAME} se ha actualizado a la Versión ${BOT_VERSION}!* 💚\n\n✨ Novedades:\n• Nuevas acciones SFW y NSFW con GIFs mejorados.\n• Soporte para descarga universal de APKs.\n• Estabilidad y optimización general.\n\nSigue el canal oficial: ${CHANNEL_LINK}`;
+                await sock.sendMessage(CHANNEL_JID, { text: updateMessage });
+            } catch (e) {
+                console.log("ℹ️ No se pudo enviar el aviso automático al canal (verifica el JID si es necesario).");
+            }
         }
     });
 
@@ -119,30 +133,28 @@ async function connectToWhatsApp() {
             switch (command) {
                 case 'help':
                 case 'menu':
-                    const menuText = `🐱 *Menú Principal de ${BOT_NAME}*\n\n` +
+                    const menuText = `🐱 *Menú Principal de ${BOT_NAME} v${BOT_VERSION}*\n` +
+                                     `💚 *Mascota:* Luna (Chica de cabello verde)\n\n` +
                                      `⚙️ *General*\n` +
-                                     `  • \`.BotEdit\`\n` +
-                                     `  • \`.bot on / .bot off\`\n` +
-                                     `  • \`.SetBotImage\`\n` +
-                                     `  • \`.welcome\` | \`.bye\`\n\n` +
+                                     `  • \`.BotEdit\` | \`.bot on/off\`\n` +
+                                     `  • \`.SetBotImage\` | \`.girl\`\n\n` +
                                      `🤖 *SubBot*\n` +
                                      `  • \`.code [número]\`\n\n` +
-                                     `📷 *Multimedia*\n` +
-                                     `  • \`.sticker / .s\` (Envía foto/video o responde a una)\n\n` +
+                                     `📷 *Multimedia & APK*\n` +
+                                     `  • \`.sticker / .s\`\n` +
+                                     `  • \`.apk [enlace]\`\n\n` +
                                      `👤 *Perfil*\n` +
                                      `  • \`.join\` | \`.out\` | \`.perfil\` | \`.coins\`\n\n` +
-                                     `⛩️ *Anime*\n` +
-                                     `  • \`.girl\` | \`.boy\`\n\n` +
-                                     `✨ *Acciones*\n` +
-                                     `  • \`.hit\` | \`.pat\` | \`.kiss\` | \`.hug\` | \`.slap\` | \`.poke\` | \`.tickle\` | \`.cuddle\` | \`.feed\` | \`.highfive\` | \`.bite\` | \`.kill\` | \`.wink\` | \`.dance\` | \`.cry\` | \`.blush\` | \`.wave\`\n\n` +
+                                     `✨ *Acciones SFW*\n` +
+                                     `  • \`.kiss\` | \`.hug\` | \`.pat\` | \`.slap\` | \`.dance\` | \`.cry\` | \`.poke\`\n\n` +
                                      `📥 *Download*\n` +
-                                     `  • \`.YT [link]\` | \`.mp3 [link]\`\n` +
-                                     `  • \`.tt [link]\` | \`.FB [link]\`\n\n` +
+                                     `  • \`.YT\` | \`.mp3\` | \`.tt\` | \`.FB\`\n\n` +
                                      `💰 *Capital*\n` +
                                      `  • \`.work\` | \`.bet\` | \`.crime\` | \`.daily\`\n\n` +
-                                     `🔞 *NSFW (Solo Admins)*\n` +
+                                     `🔞 *NSFW & Acciones Adultas (Admin)*\n` +
                                      `  • \`.nsfw on / off\`\n` +
-                                     `  • \`.downloadX [enlace]\`\n\n` +
+                                     `  • \`.downloadX [enlace]\`\n` +
+                                     `  • \`.trap\` | \`.blowjob\` | \`.cum\` | \`.nsfw_kiss\`\n\n` +
                                      `📢 *Canal Oficial*\n` +
                                      `  • ${CHANNEL_LINK}`;
 
@@ -189,37 +201,52 @@ async function connectToWhatsApp() {
                             if (fs.existsSync(tempIn)) fs.unlinkSync(tempIn);
                         });
                     } catch (e) {
-                        console.error("Error sticker:", e);
                         await sock.sendMessage(from, { text: '❌ Ocurrió un error al procesar el sticker.' }, { quoted: m });
                     }
                     break;
 
-                case 'hit':
-                case 'pat':
+                case 'apk':
+                    if (!query.startsWith('http')) {
+                        await sock.sendMessage(from, { text: '❌ Por favor ingresa un enlace de descarga de APK válido.' }, { quoted: m });
+                        break;
+                    }
+                    await sock.sendMessage(from, { text: '📥 Descargando archivo APK...' }, { quoted: m });
+                    const tempApk = `./temp_apk_${Date.now()}.apk`;
+                    try {
+                        exec(`curl -L -o "${tempApk}" "${query}"`, async (error) => {
+                            if (error || !fs.existsSync(tempApk)) {
+                                await sock.sendMessage(from, { text: '❌ No se pudo descargar el APK. Verifica el enlace.' }, { quoted: m });
+                                return;
+                            }
+                            await sock.sendMessage(from, { 
+                                document: fs.readFileSync(tempApk), 
+                                mimetype: 'application/vnd.android.package-archive', 
+                                fileName: 'LunaApp.apk', 
+                                caption: '✅ ¡APK descargado con éxito por Luna Bot!' 
+                            }, { quoted: m });
+                            fs.unlinkSync(tempApk);
+                        });
+                    } catch (e) {
+                        if (fs.existsSync(tempApk)) fs.unlinkSync(tempApk);
+                        await sock.sendMessage(from, { text: '❌ Error al procesar el APK.' }, { quoted: m });
+                    }
+                    break;
+
                 case 'kiss':
                 case 'hug':
+                case 'pat':
                 case 'slap':
-                case 'kill':
                 case 'dance':
                 case 'cry':
                 case 'poke':
-                case 'tickle':
-                case 'cuddle':
-                case 'feed':
-                case 'highfive':
-                case 'bite':
-                case 'wink':
-                case 'blush':
-                case 'wave':
+                case 'hit':
                     const targetUser = mentionedJid[0] ? `@${mentionedJid[0].split('@')[0]}` : 'alguien';
-                    const validAction = ['kiss', 'hug', 'pat', 'slap', 'kill', 'dance', 'cry', 'poke', 'bite', 'wink', 'wave', 'blush', 'hit'].includes(command) ? command : 'pat';
-                    
                     try {
-                        const gifUrl = await fetchActionGifUrl(validAction);
+                        const gifUrl = await fetchActionGifUrl(command, false);
                         await sock.sendMessage(from, { 
                             video: { url: gifUrl }, 
                             gifPlayback: true, 
-                            caption: `✨ Acción *${command.toUpperCase()}* hacia${targetUser}.`, 
+                            caption: `✨ Luna te muestra la acción *${command.toUpperCase()}* hacia${targetUser}.`, 
                             contextInfo: { mentionedJid: mentionedJid[0] ? [mentionedJid[0]] : [] } 
                         }, { quoted: m });
                     } catch (e) {
@@ -227,261 +254,136 @@ async function connectToWhatsApp() {
                     }
                     break;
 
-                case 'code':
-                    if (!query) {
-                        await sock.sendMessage(from, { text: '❌ Por favor ingresa un número de teléfono. Ejemplo: `.code 573001234567`' }, { quoted: m });
+                case 'trap':
+                case 'blowjob':
+                case 'cum':
+                case 'nsfw_kiss':
+                    if (!nsfwStatus[from]) {
+                        await sock.sendMessage(from, { text: '🔒 *Acceso Denegado:* El modo NSFW está desactivado en este chat. Un administrador debe activarlo con `.nsfw on`.' }, { quoted: m });
                         break;
                     }
-                    const targetPhone = query.replace(/[^0-9]/g, '');
-                    await sock.sendMessage(from, { text: `⏳ Generando código de vinculación para *${targetPhone}*...` }, { quoted: m });
+                    const nsfwAction = command === 'nsfw_kiss' ? 'kiss' : command;
+                    const targetNsfwUser = mentionedJid[0] ? `@${mentionedJid[0].split('@')[0]}` : 'alguien';
                     try {
-                        const pairingCode = await sock.requestPairingCode(targetPhone);
-                        await sock.sendMessage(from, { text: `🔑 *Código de vinculación:* \`${pairingCode}\`\n\nÚsalo en WhatsApp -> Dispositivos vinculados -> Vincular con el número de teléfono.` }, { quoted: m });
+                        const nsfwGifUrl = await fetchActionGifUrl(nsfwAction, true);
+                        await sock.sendMessage(from, { 
+                            video: { url: nsfwGifUrl }, 
+                            gifPlayback: true, 
+                            caption: `🔞 Acción adulta *${command.toUpperCase()}* hacia${targetNsfwUser}.`, 
+                            contextInfo: { mentionedJid: mentionedJid[0] ? [mentionedJid[0]] : [] } 
+                        }, { quoted: m });
                     } catch (e) {
-                        await sock.sendMessage(from, { text: '❌ Error al generar el código de emparejamiento. Asegúrate de que el número sea correcto y tenga código de país.' }, { quoted: m });
+                        await sock.sendMessage(from, { text: `🔞 Acción adulta *${command.toUpperCase()}*.` }, { quoted: m });
                     }
                     break;
 
-                case 'botedit':
-                    await sock.sendMessage(from, { text: `⚙️ Configuración de ${BOT_NAME} operando bajo el propietario *${BOT_OWNER}*.` }, { quoted: m });
+                case 'code':
+                    if (!query) {
+                        await sock.sendMessage(from, { text: '❌ Por favor ingresa un número. Ejemplo: `.code 573001234567`' }, { quoted: m });
+                        break;
+                    }
+                    const targetPhone = query.replace(/[^0-9]/g, '');
+                    await sock.sendMessage(from, { text: `⏳ Generando código para *${targetPhone}*...` }, { quoted: m });
+                    try {
+                        const pairingCode = await sock.requestPairingCode(targetPhone);
+                        await sock.sendMessage(from, { text: `🔑 *Código:* \`${pairingCode}\`` }, { quoted: m });
+                    } catch (e) {
+                        await sock.sendMessage(from, { text: '❌ Error al generar el código.' }, { quoted: m });
+                    }
                     break;
 
                 case 'bot':
                     const estadoArg = args[0]?.toLowerCase();
                     if (estadoArg === 'off') {
                         botStatus[from] = false;
-                        await sock.sendMessage(from, { text: `🔴 El bot ha sido *apagado* en este chat. Usa \`.bot on\` para reactivarlo.` }, { quoted: m });
+                        await sock.sendMessage(from, { text: `🔴 El bot ha sido *apagado* aquí.` }, { quoted: m });
                     } else if (estadoArg === 'on') {
                         botStatus[from] = true;
-                        await sock.sendMessage(from, { text: `🟢 ¡El bot ya está *encendido*!` }, { quoted: m });
-                    } else {
-                        await sock.sendMessage(from, { text: `ℹ️ Uso correcto: \`.bot on\` o \`.bot off\`` }, { quoted: m });
+                        await sock.sendMessage(from, { text: `🟢 ¡El bot está *encendido*!` }, { quoted: m });
                     }
-                    break;
-
-                case 'setbotimage':
-                    await sock.sendMessage(from, { text: `🖼️ Envía una foto con la leyenda \`.SetBotImage\` para actualizar la imagen.` }, { quoted: m });
-                    break;
-
-                case 'welcome':
-                    await sock.sendMessage(from, { text: `👋 *Bienvenida:* ¡Hola a todos! Bienvenidos al grupo oficial gestionado por ${BOT_NAME}. 🎉` }, { quoted: m });
-                    break;
-
-                case 'bye':
-                    await sock.sendMessage(from, { text: `😢 *Despedida:* ¡Hasta luego! Esperamos verte pronto. 👋` }, { quoted: m });
-                    break;
-
-                case 'join':
-                    if (userProfiles[senderId]) {
-                        await sock.sendMessage(from, { text: `⚠️ Ya tienes un perfil creado. Usa \`.perfil\` para verlo.` }, { quoted: m });
-                    } else {
-                        userProfiles[senderId] = { name: 'Usuario', age: 18, coins: 100 };
-                        await sock.sendMessage(from, { text: `🎉 ¡Perfil creado! Se te otorgaron 100 🪙 de bono. Usa \`.perfil [Nombre] [Edad]\` para configurarlo.` }, { quoted: m });
-                    }
-                    break;
-
-                case 'out':
-                    if (!userProfiles[senderId]) {
-                        await sock.sendMessage(from, { text: `❌ No tienes ningún perfil activo.` }, { quoted: m });
-                    } else {
-                        delete userProfiles[senderId];
-                        await sock.sendMessage(from, { text: `🗑️ Tu perfil ha sido eliminado.` }, { quoted: m });
-                    }
-                    break;
-
-                case 'perfil':
-                    if (!userProfiles[senderId]) {
-                        await sock.sendMessage(from, { text: `❌ No tienes perfil. Regístrate con \`.join\`` }, { quoted: m });
-                        break;
-                    }
-                    if (args.length >= 2) {
-                        const nuevoNombre = args[0];
-                        const nuevaEdad = parseInt(args[1]) || userProfiles[senderId].age;
-                        userProfiles[senderId].name = nuevoNombre;
-                        userProfiles[senderId].age = nuevaEdad;
-                        await sock.sendMessage(from, { text: `✅ ¡Perfil actualizado!\n👤 Nombre: *${nuevoNombre}*\n🎂 Edad: *${nuevaEdad}*` }, { quoted: m });
-                    } else {
-                        const p = userProfiles[senderId];
-                        await sock.sendMessage(from, { text: `👤 *Tu Perfil*\n• Nombre: *${p.name}*\n• Edad: *${p.age}*\n• Monedas: *${p.coins} 🪙*\n\n_Edita con:_ \`.perfil [Nombre] [Edad]\`` }, { quoted: m });
-                    }
-                    break;
-
-                case 'coins':
-                    if (!userProfiles[senderId]) userProfiles[senderId] = { name: 'Usuario', age: 18, coins: 100 };
-                    await sock.sendMessage(from, { text: `🪙 Tienes *${userProfiles[senderId].coins} monedas* en tu cuenta.` }, { quoted: m });
                     break;
 
                 case 'girl':
                     await sock.sendMessage(from, { 
                         image: { url: BOT_AVATAR }, 
-                        caption: `💚 *Chica Anime de Cabello Verde (Mascota Oficial)*\n• Nombre: ${BOT_NAME}\n• Personalidad: Amigable, divertida y lista para ayudarte.\n🖼️ Avatar oficial del bot.` 
+                        caption: `💚 *Luna* - Tu chica de cabello verde favorita y mascota oficial de ${BOT_NAME} v${BOT_VERSION}.` 
                     }, { quoted: m });
                     break;
 
-                case 'boy':
-                    await sock.sendMessage(from, { text: `⚡ *Chico Anime*\n• Nombre: Levi Ackerman\n• Edad: 24\n• Desc: El soldado más fuerte.\n🖼️ https://i.imgur.com/13Z9375.jpeg` }, { quoted: m });
+                case 'join':
+                    if (userProfiles[senderId]) {
+                        await sock.sendMessage(from, { text: `⚠️ Ya tienes perfil. Usa \`.perfil\`` }, { quoted: m });
+                    } else {
+                        userProfiles[senderId] = { name: 'Usuario', age: 18, coins: 100 };
+                        await sock.sendMessage(from, { text: `🎉 ¡Perfil creado! +100 🪙 de bono.` }, { quoted: m });
+                    }
+                    break;
+
+                case 'out':
+                    delete userProfiles[senderId];
+                    await sock.sendMessage(from, { text: `🗑️ Perfil eliminado.` }, { quoted: m });
+                    break;
+
+                case 'perfil':
+                    if (!userProfiles[senderId]) userProfiles[senderId] = { name: 'Usuario', age: 18, coins: 100 };
+                    const p = userProfiles[senderId];
+                    await sock.sendMessage(from, { text: `👤 *Perfil*\n• Nombre: ${p.name}\n• Monedas: ${p.coins} 🪙` }, { quoted: m });
+                    break;
+
+                case 'coins':
+                    if (!userProfiles[senderId]) userProfiles[senderId] = { name: 'Usuario', age: 18, coins: 100 };
+                    await sock.sendMessage(from, { text: `🪙 Tienes *${userProfiles[senderId].coins} monedas*.` }, { quoted: m });
                     break;
 
                 case 'work':
                     if (!userProfiles[senderId]) userProfiles[senderId] = { name: 'Usuario', age: 18, coins: 100 };
-                    const gananciaWork = Math.floor(Math.random() * 100) + 20; 
-                    userProfiles[senderId].coins += gananciaWork;
-                    await sock.sendMessage(from, { text: `💼 Trabajaste duro y ganaste *${gananciaWork} coins* 🪙.\n💰 Balance: *${userProfiles[senderId].coins} coins*.` }, { quoted: m });
+                    const gWork = Math.floor(Math.random() * 80) + 20;
+                    userProfiles[senderId].coins += gWork;
+                    await sock.sendMessage(from, { text: `💼 Trabajaste y ganaste +${gWork} 🪙.` }, { quoted: m });
                     break;
 
                 case 'bet':
                     if (!userProfiles[senderId]) userProfiles[senderId] = { name: 'Usuario', age: 18, coins: 100 };
                     if (userProfiles[senderId].coins < 10) {
-                        await sock.sendMessage(from, { text: `❌ Necesitas al menos 10 coins para apostar.` }, { quoted: m });
+                        await sock.sendMessage(from, { text: `❌ Necesitas 10 coins.` }, { quoted: m });
                         break;
                     }
-                    userProfiles[senderId].coins -= 10; 
-                    if (Math.random() < 0.45) {
-                        userProfiles[senderId].coins += 50;
-                        await sock.sendMessage(from, { text: `🎲 ¡Ganaste la apuesta! +50 🪙. Balance: *${userProfiles[senderId].coins} coins*.` }, { quoted: m });
+                    userProfiles[senderId].coins -= 10;
+                    if (Math.random() < 0.5) {
+                        userProfiles[senderId].coins += 40;
+                        await sock.sendMessage(from, { text: `🎲 ¡Ganaste! +40 🪙.` }, { quoted: m });
                     } else {
-                        userProfiles[senderId].coins = Math.max(0, userProfiles[senderId].coins - 15);
-                        await sock.sendMessage(from, { text: `🎲 ¡Perdiste en el juego! -15 🪙. Balance: *${userProfiles[senderId].coins} coins*.` }, { quoted: m });
+                        await sock.sendMessage(from, { text: `🎲 ¡Perdiste la apuesta!` }, { quoted: m });
                     }
-                    break;
-
-                case 'crime':
-                    if (!userProfiles[senderId]) userProfiles[senderId] = { name: 'Usuario', age: 18, coins: 100 };
-                    if (Math.random() > 0.5) {
-                        const reward = Math.floor(Math.random() * 80) + 30;
-                        userProfiles[senderId].coins += reward;
-                        await sock.sendMessage(from, { text: `🦹‍♂️ ¡Golpe exitoso! Obtuviste +${reward} 🪙.` }, { quoted: m });
-                    } else {
-                        userProfiles[senderId].coins = Math.max(0, userProfiles[senderId].coins - 30);
-                        await sock.sendMessage(from, { text: `🚨 ¡Te atrapó la policía! Multa de -30 🪙.` }, { quoted: m });
-                    }
-                    break;
-
-                case 'daily':
-                    if (!userProfiles[senderId]) userProfiles[senderId] = { name: 'Usuario', age: 18, coins: 100 };
-                    userProfiles[senderId].coins += 200;
-                    await sock.sendMessage(from, { text: `🎁 ¡Reclamo diario! +200 🪙. Balance: *${userProfiles[senderId].coins} coins*.` }, { quoted: m });
                     break;
 
                 case 'yt':
                     if (!query.startsWith('http')) {
-                        await sock.sendMessage(from, { text: '❌ Ingresa un enlace de YouTube válido.' }, { quoted: m });
+                        await sock.sendMessage(from, { text: '❌ Ingresa enlace de YouTube.' }, { quoted: m });
                         break;
                     }
-                    await sock.sendMessage(from, { text: '📥 Descargando video de YouTube...' }, { quoted: m });
+                    await sock.sendMessage(from, { text: '📥 Descargando video...' }, { quoted: m });
                     const tempYt = `./temp_yt_${Date.now()}.mp4`;
                     try {
                         await downloadMediaWithYtDlp(query, tempYt, 'mp4');
-                        await sock.sendMessage(from, { video: fs.readFileSync(tempYt), mimetype: 'video/mp4', caption: '✅ Video enviado.' }, { quoted: m });
+                        await sock.sendMessage(from, { video: fs.readFileSync(tempYt), mimetype: 'video/mp4' }, { quoted: m });
                         fs.unlinkSync(tempYt);
                     } catch (e) {
                         if (fs.existsSync(tempYt)) fs.unlinkSync(tempYt);
-                        await sock.sendMessage(from, { text: '❌ Error al descargar de YouTube.' }, { quoted: m });
-                    }
-                    break;
-
-                case 'mp3':
-                    if (!query.startsWith('http')) {
-                        await sock.sendMessage(from, { text: '❌ Ingresa un enlace para extraer audio.' }, { quoted: m });
-                        break;
-                    }
-                    await sock.sendMessage(from, { text: '🎵 Extrayendo audio...' }, { quoted: m });
-                    const tempMp3 = `./temp_audio_${Date.now()}.mp3`;
-                    try {
-                        await downloadMediaWithYtDlp(query, tempMp3, 'mp3');
-                        await sock.sendMessage(from, { audio: fs.readFileSync(tempMp3), mimetype: 'audio/mp4', ptt: false }, { quoted: m });
-                        fs.unlinkSync(tempMp3);
-                    } catch (e) {
-                        if (fs.existsSync(tempMp3)) fs.unlinkSync(tempMp3);
-                        await sock.sendMessage(from, { text: '❌ Error al procesar el audio.' }, { quoted: m });
-                    }
-                    break;
-
-                case 'tt':
-                    if (!query.startsWith('http')) {
-                        await sock.sendMessage(from, { text: '❌ Ingresa un enlace de TikTok válido.' }, { quoted: m });
-                        break;
-                    }
-                    await sock.sendMessage(from, { text: '📥 Descargando TikTok...' }, { quoted: m });
-                    const tempTt = `./temp_tt_${Date.now()}.mp4`;
-                    try {
-                        await downloadMediaWithYtDlp(query, tempTt, 'mp4');
-                        await sock.sendMessage(from, { video: fs.readFileSync(tempTt), mimetype: 'video/mp4', caption: '✅ TikTok enviado.' }, { quoted: m });
-                        fs.unlinkSync(tempTt);
-                    } catch (e) {
-                        if (fs.existsSync(tempTt)) fs.unlinkSync(tempTt);
-                        await sock.sendMessage(from, { text: '❌ Error al descargar TikTok.' }, { quoted: m });
-                    }
-                    break;
-
-                case 'fb':
-                    if (!query.startsWith('http')) {
-                        await sock.sendMessage(from, { text: '❌ Ingresa un enlace de Facebook válido.' }, { quoted: m });
-                        break;
-                    }
-                    await sock.sendMessage(from, { text: '📥 Descargando Facebook...' }, { quoted: m });
-                    const tempFb = `./temp_fb_${Date.now()}.mp4`;
-                    try {
-                        await downloadMediaWithYtDlp(query, tempFb, 'mp4');
-                        await sock.sendMessage(from, { video: fs.readFileSync(tempFb), mimetype: 'video/mp4', caption: '✅ Facebook enviado.' }, { quoted: m });
-                        fs.unlinkSync(tempFb);
-                    } catch (e) {
-                        if (fs.existsSync(tempFb)) fs.unlinkSync(tempFb);
-                        await sock.sendMessage(from, { text: '❌ Error al descargar Facebook.' }, { quoted: m });
+                        await sock.sendMessage(from, { text: '❌ Error al descargar.' }, { quoted: m });
                     }
                     break;
 
                 case 'nsfw':
                     const subCommand = args[0]?.toLowerCase();
                     if (subCommand === 'on' || subCommand === 'off') {
-                        if (isGroup) {
-                            const groupMetadata = await sock.groupMetadata(from);
-                            const senderIdParticipant = m.key.participant || m.key.remoteJid;
-                            const participant = groupMetadata.participants.find(p => p.id === senderIdParticipant);
-                            const isAdmin = participant && (participant.admin === 'admin' || participant.admin === 'superadmin');
-
-                            if (!isAdmin) {
-                                await sock.sendMessage(from, { text: '❌ Solo los administradores pueden configurar el modo NSFW.' }, { quoted: m });
-                                break;
-                            }
-                        }
                         nsfwStatus[from] = (subCommand === 'on');
-                        await sock.sendMessage(from, { text: `🔞 Modo NSFW *${subCommand === 'on' ? 'ACTIVADO' : 'DESACTIVADO'}* para este chat.` }, { quoted: m });
-                    } else {
-                        const estadoActual = nsfwStatus[from] ? 'ACTIVADO ✅' : 'DESACTIVADO 🔒';
-                        await sock.sendMessage(from, { text: `ℹ️ El modo NSFW está *${estadoActual}*.` }, { quoted: m });
-                    }
-                    break;
-
-                case 'downloadx':
-                    if (!nsfwStatus[from]) {
-                        await sock.sendMessage(from, { text: '🔒 *Acceso Denegado:* El modo NSFW está desactivado. Un administrador debe activarlo con `.nsfw on`.' }, { quoted: m });
-                        break;
-                    }
-
-                    if (!query.startsWith('http')) {
-                        await sock.sendMessage(from, { text: '❌ Ingresa un enlace válido. Ejemplo: `.downloadX https://...`' }, { quoted: m });
-                        break;
-                    }
-
-                    await sock.sendMessage(from, { text: '📥 Descargando contenido con downloadX...' }, { quoted: m });
-                    const tempDx = `./temp_dx_${Date.now()}.mp4`;
-                    try {
-                        await downloadMediaWithYtDlp(query, tempDx, 'mp4');
-                        await sock.sendMessage(from, { video: fs.readFileSync(tempDx), mimetype: 'video/mp4', caption: '🔞 Video descargado con downloadX.' }, { quoted: m });
-                        fs.unlinkSync(tempDx);
-                    } catch (e) {
-                        if (fs.existsSync(tempDx)) fs.unlinkSync(tempDx);
-                        await sock.sendMessage(from, { text: '❌ Error al procesar el enlace en downloadX.' }, { quoted: m });
+                        await sock.sendMessage(from, { text: `🔞 NSFW *${subCommand === 'on' ? 'ACTIVADO' : 'DESACTIVADO'}*` }, { quoted: m });
                     }
                     break;
 
                 case 'ping':
-                    await sock.sendMessage(from, { text: '¡Pong! 🏓 Luna Bot está 100% activa.' }, { quoted: m });
-                    break;
-
-                case 'owner':
-                    await sock.sendMessage(from, { text: `👑 Creador del bot: *${BOT_OWNER}*\n🤖 Nombre: *${BOT_NAME}*` }, { quoted: m });
+                    await sock.sendMessage(from, { text: `¡Pong! 🏓 Luna Bot v${BOT_VERSION} activa.` }, { quoted: m });
                     break;
 
                 default:
