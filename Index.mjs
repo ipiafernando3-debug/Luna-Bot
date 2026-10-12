@@ -5,10 +5,10 @@ import { exec } from 'child_process';
 import readline from 'readline';
 
 const BOT_NAME = "Luna Bot";
-const BOT_VERSION = "1.1.5";
+const BOT_VERSION = "1.1.6";
 const BOT_OWNER = "Benjamin";
-// Enlace estable y directo garantizado para el avatar de Luna
-const BOT_AVATAR = "https://i.imgur.com/v8ZpM0M.jpeg"; 
+// Enlace proporcionado de la imagen de Luna
+const BOT_AVATAR_URL = "https://share.google/kciqVaXNYWKSljRaC"; 
 const CHANNEL_LINK = "https://whatsapp.com/channel/0029VbE6xIIJP20w9b02kz1p";
 const CHANNEL_JID = "120363381484218941@newsletter"; // Canal oficial de WhatsApp
 
@@ -120,6 +120,29 @@ async function sendGifAction(sock, from, m, action, isNsfw, captionText, mention
     }
 }
 
+// Función para descargar el avatar localmente y enviarlo sin depender de URLs externas
+async function sendLunaAvatar(sock, from, captionText, m) {
+    const tempAvatar = `./temp_avatar_${Date.now()}.jpg`;
+    try {
+        await new Promise((resolve, reject) => {
+            exec(`curl -L -s -o "${tempAvatar}" "${BOT_AVATAR_URL}"`, (err) => {
+                if (err || !fs.existsSync(tempAvatar)) reject(err);
+                else resolve();
+            });
+        });
+
+        await sock.sendMessage(from, { 
+            image: fs.readFileSync(tempAvatar), 
+            caption: captionText 
+        }, { quoted: m });
+
+    } catch (e) {
+        await sock.sendMessage(from, { text: captionText }, { quoted: m });
+    } finally {
+        if (fs.existsSync(tempAvatar)) fs.unlinkSync(tempAvatar);
+    }
+}
+
 async function connectToWhatsApp() {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
 
@@ -162,10 +185,10 @@ async function connectToWhatsApp() {
             console.log(`\n¡${BOT_NAME} v${BOT_VERSION} está en línea y conectada permanentemente! ✅\n`);
             
             try {
-                const updateMessage = `🚀 *¡${BOT_NAME} se ha actualizado a la Versión ${BOT_VERSION}!* 💚\n\n✨ Novedades:\n• Corrección de error 404 en el enlace de la imagen de avatar para evitar cierres en el comando .help.\n\nSigue el canal oficial: ${CHANNEL_LINK}`;
+                const updateMessage = `🚀 *¡${BOT_NAME} se ha actualizado a la Versión ${BOT_VERSION}!* 💚\n\n✨ Novedades:\n• Descarga local automática del avatar de Luna para garantizar que aparezca siempre sin errores 404 en el menú (.help).\n\nSigue el canal oficial: ${CHANNEL_LINK}`;
                 await sock.sendMessage(CHANNEL_JID, { text: updateMessage });
             } catch (e) {
-                console.log("ℹ️ Conectado. (Aviso de actualización v1.1.5 preparado para el canal).");
+                console.log("ℹ️ Conectado. (Aviso de actualización v1.1.6 preparado para el canal).");
             }
         }
     });
@@ -233,7 +256,7 @@ async function connectToWhatsApp() {
                                      `📢 *Canal Oficial*\n` +
                                      `  • ${CHANNEL_LINK}`;
 
-                    await sock.sendMessage(from, { image: { url: BOT_AVATAR }, caption: menuText }, { quoted: m });
+                    await sendLunaAvatar(sock, from, menuText, m);
                     break;
 
                 case 'sticker':
@@ -456,10 +479,7 @@ async function connectToWhatsApp() {
                     break;
 
                 case 'girl':
-                    await sock.sendMessage(from, { 
-                        image: { url: BOT_AVATAR }, 
-                        caption: `💚 *Luna* - Tu chica de cabello verde favorita y mascota oficial de ${BOT_NAME} v${BOT_VERSION}.` 
-                    }, { quoted: m });
+                    await sendLunaAvatar(sock, from, `💚 *Luna* - Tu chica de cabello verde favorita y mascota oficial de ${BOT_NAME} v${BOT_VERSION}.`, m);
                     break;
 
                 case 'join':
