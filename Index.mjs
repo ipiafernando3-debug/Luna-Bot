@@ -5,10 +5,10 @@ import { exec } from 'child_process';
 import readline from 'readline';
 
 const BOT_NAME = "Luna Bot";
-const BOT_VERSION = "1.1.3";
+const BOT_VERSION = "1.1.4";
 const BOT_OWNER = "Benjamin";
-// Enlace actualizado con la nueva imagen de Luna (chica de cabello verde)
-const BOT_AVATAR = "https://share.google/lNkQp78sZ9eG8YkhK"; 
+// Enlace directo en formato PNG/JPEG optimizado para WhatsApp
+const BOT_AVATAR = "https://i.ibb.co/6y4G8h6/luna-avatar.jpg"; 
 const CHANNEL_LINK = "https://whatsapp.com/channel/0029VbE6xIIJP20w9b02kz1p";
 const CHANNEL_JID = "120363381484218941@newsletter"; // Canal oficial de WhatsApp
 
@@ -44,13 +44,16 @@ async function safeFetchJson(url) {
 
 async function fetchActionGifUrl(action, isNsfw = false) {
     if (isNsfw) {
-        const purrEndpoints = {
+        const purrMap = {
             'blowjob': 'https://purrbot.site/api/img/nsfw/blowjob/gif',
             'cum': 'https://purrbot.site/api/img/nsfw/cum/gif',
-            'fuck': 'https://purrbot.site/api/img/nsfw/fuck/gif'
+            'trap': 'https://purrbot.site/api/img/nsfw/trap/gif',
+            'fuck': 'https://purrbot.site/api/img/nsfw/fuck/gif',
+            'kiss': 'https://purrbot.site/api/img/nsfw/kiss/gif'
         };
-        if (purrEndpoints[action]) {
-            const dataPurr = await safeFetchJson(purrEndpoints[action]);
+
+        if (purrMap[action]) {
+            const dataPurr = await safeFetchJson(purrMap[action]);
             if (dataPurr && !dataPurr.error && dataPurr.link) return dataPurr.link;
         }
 
@@ -75,7 +78,7 @@ async function fetchActionGifUrl(action, isNsfw = false) {
         const dataWaifu = await safeFetchJson(`https://api.waifu.pics/sfw/${action}`);
         if (dataWaifu && dataWaifu.url) return dataWaifu.url;
 
-        return "https://api.waifu.pics/sfw/hug";
+        return `https://api.waifu.pics/sfw/${action === 'hit' ? 'slap' : (action || 'hug')}`;
     }
 }
 
@@ -159,10 +162,10 @@ async function connectToWhatsApp() {
             console.log(`\n¡${BOT_NAME} v${BOT_VERSION} está en línea y conectada permanentemente! ✅\n`);
             
             try {
-                const updateMessage = `🚀 *¡${BOT_NAME} se ha actualizado a la Versión ${BOT_VERSION}!* 💚\n\n✨ Novedades:\n• Reemplazada la imagen de avatar rota de Luna por el nuevo arte oficial.\n• Corrección completa en menú y comando .girl.\n\nSigue el canal oficial: ${CHANNEL_LINK}`;
+                const updateMessage = `🚀 *¡${BOT_NAME} se ha actualizado a la Versión ${BOT_VERSION}!* 💚\n\n✨ Novedades:\n• Enlace de avatar corregido a formato directo de imagen para mostrar correctamente la foto en el menú (.help).\n• Optimización de GIFs en acciones SFW y NSFW.\n\nSigue el canal oficial: ${CHANNEL_LINK}`;
                 await sock.sendMessage(CHANNEL_JID, { text: updateMessage });
             } catch (e) {
-                console.log("ℹ️ Conectado. (Aviso de actualización v1.1.3 preparado para el canal).");
+                console.log("ℹ️ Conectado. (Aviso de actualización v1.1.4 preparado para el canal).");
             }
         }
     });
@@ -491,4 +494,4 @@ async function connectToWhatsApp() {
     });
 }
 
-connectToWhatsApp(); 
+connectToWhatsApp();
