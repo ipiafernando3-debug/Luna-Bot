@@ -98,12 +98,12 @@ async function connectToWhatsApp() {
                                      `  • \`.hit\` | \`.pat\` | \`.kiss\` | \`.hug\` | \`.slap\` | \`.poke\` | \`.tickle\` | \`.cuddle\` | \`.feed\` | \`.highfive\` | \`.bite\` | \`.kill\` | \`.wink\` | \`.dance\` | \`.cry\` | \`.blush\` | \`.wave\`\n\n` +
                                      `📥 *Download*\n` +
                                      `  • \`.YT [link]\` | \`.mp3 [link]\`\n` +
-                                     `  • \`.tt [link]\` | \`.FB [link]\`\n` +
-                                     `  • \`.downloadX [enlace] (NSFW)\`\n\n` +
+                                     `  • \`.tt [link]\` | \`.FB [link]\`\n\n` +
                                      `💰 *Capital*\n` +
                                      `  • \`.work\` | \`.bet\` | \`.crime\` | \`.daily\`\n\n` +
                                      `🔞 *NSFW (Solo Admins)*\n` +
-                                     `  • \`.nsfw on / off\``;
+                                     `  • \`.nsfw on / off\`\n` +
+                                     `  • \`.downloadX [enlace]\``;
 
                     await sock.sendMessage(from, { text: menuText }, { quoted: m });
                     break;
