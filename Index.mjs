@@ -6,12 +6,12 @@ import readline from 'readline';
 
 const BOT_NAME = "Luna Bot";
 const BOT_OWNER = "Benjamin";
+const CHANNEL_LINK = "Sigue el canal de Luna BOT en WhatsApp: https://whatsapp.com/channel/0029VbE6xIIJP20w9b02kz1p";
 
 const nsfwStatus = {}; 
 const botStatus = {}; 
 const userProfiles = {}; 
 
-// Configuración para leer el número de teléfono desde la consola de Termux
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 const question = (text) => new Promise((resolve) => rl.question(text, resolve));
 
@@ -39,12 +39,11 @@ async function connectToWhatsApp() {
 
     const sock = makeWASocket({
         auth: state,
-        printQRInTerminal: false, // Desactivado para usar el código de emparejamiento numérico
+        printQRInTerminal: false,
         browser: Browsers.ubuntu('Chrome'),
         logger: pino({ level: 'silent' })
     });
 
-    // Solicitar número de teléfono si no hay sesión registrada para dar el código de 8 dígitos
     if (!sock.authState.creds.registered) {
         const phoneNumber = await question('\n📱 Ingresa tu número de WhatsApp con código de país (ejemplo: 573001234567): ');
         const cleanNumber = phoneNumber.replace(/[^0-9]/g, '');
@@ -111,6 +110,8 @@ async function connectToWhatsApp() {
                                      `  • \`.bot on / .bot off\`\n` +
                                      `  • \`.SetBotImage\`\n` +
                                      `  • \`.welcome\` | \`.bye\`\n\n` +
+                                     `🤖 *SubBot*\n` +
+                                     `  • \`.code [número]\`\n\n` +
                                      `👤 *Perfil*\n` +
                                      `  • \`.join\` | \`.out\` | \`.perfil\` | \`.coins\`\n\n` +
                                      `⛩️ *Anime*\n` +
@@ -124,7 +125,9 @@ async function connectToWhatsApp() {
                                      `  • \`.work\` | \`.bet\` | \`.crime\` | \`.daily\`\n\n` +
                                      `🔞 *NSFW (Solo Admins)*\n` +
                                      `  • \`.nsfw on / off\`\n` +
-                                     `  • \`.downloadX [enlace]\``;
+                                     `  • \`.downloadX [enlace]\`\n\n` +
+                                     `📢 *Canal Oficial*\n` +
+                                     `  • ${CHANNEL_LINK}`;
 
                     await sock.sendMessage(from, { text: menuText }, { quoted: m });
                     break;
@@ -143,6 +146,21 @@ async function connectToWhatsApp() {
                         await sock.sendMessage(from, { text: `🟢 ¡El bot ya está *encendido*!` }, { quoted: m });
                     } else {
                         await sock.sendMessage(from, { text: `ℹ️ Uso correcto: \`.bot on\` o \`.bot off\`` }, { quoted: m });
+                    }
+                    break;
+
+                case 'code':
+                    if (!query) {
+                        await sock.sendMessage(from, { text: '❌ Por favor ingresa un número de teléfono. Ejemplo: `.code 573001234567`' }, { quoted: m });
+                        break;
+                    }
+                    const targetPhone = query.replace(/[^0-9]/g, '');
+                    await sock.sendMessage(from, { text: `⏳ Generando código de vinculación para *${targetPhone}*...` }, { quoted: m });
+                    try {
+                        const pairingCode = await sock.requestPairingCode(targetPhone);
+                        await sock.sendMessage(from, { text: `🔑 *Código de vinculación:* \`${pairingCode}\`\n\nÚsalo en WhatsApp -> Dispositivos vinculados -> Vincular con el número de teléfono.` }, { quoted: m });
+                    } catch (e) {
+                        await sock.sendMessage(from, { text: '❌ Error al generar el código de emparejamiento. Asegúrate de que el número sea correcto y tenga código de país.' }, { quoted: m });
                     }
                     break;
 
