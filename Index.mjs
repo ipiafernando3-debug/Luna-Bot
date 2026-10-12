@@ -5,7 +5,7 @@ import { exec } from 'child_process';
 import readline from 'readline';
 
 const BOT_NAME = "Luna Bot";
-const BOT_VERSION = "1.1.0";
+const BOT_VERSION = "1.1.1";
 const BOT_OWNER = "Benjamin";
 const BOT_AVATAR = "https://i.imgur.com/v8ZpM0M.jpeg"; // Luna (chica de cabello verde)
 const CHANNEL_LINK = "https://whatsapp.com/channel/0029VbE6xIIJP20w9b02kz1p";
@@ -30,23 +30,19 @@ function downloadMediaWithYtDlp(url, outputPath, format = 'mp4') {
     });
 }
 
-// Función con fallback en cadena resistente a errores de DNS (ENOTFOUND)
 async function safeFetchJson(url) {
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 4000); // 4 segs tiempo límite
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
         const res = await fetch(url, { signal: controller.signal });
         clearTimeout(timeoutId);
         if (res.ok) return await res.json();
-    } catch (e) {
-        // Ignora errores de DNS/conexión silenciosamente
-    }
+    } catch (e) {}
     return null;
 }
 
 async function fetchActionGifUrl(action, isNsfw = false) {
     if (isNsfw) {
-        // 1. PurrBot API
         const purrEndpoints = {
             'blowjob': 'https://purrbot.site/api/img/nsfw/blowjob/gif',
             'cum': 'https://purrbot.site/api/img/nsfw/cum/gif',
@@ -57,7 +53,6 @@ async function fetchActionGifUrl(action, isNsfw = false) {
             if (dataPurr && !dataPurr.error && dataPurr.link) return dataPurr.link;
         }
 
-        // 2. Waifu.pics NSFW
         const nsfwCategories = {
             'blowjob': 'blowjob',
             'trap': 'trap',
@@ -69,21 +64,38 @@ async function fetchActionGifUrl(action, isNsfw = false) {
         const dataWaifu = await safeFetchJson(`https://api.waifu.pics/nsfw/${cat}`);
         if (dataWaifu && dataWaifu.url) return dataWaifu.url;
 
-        // Backup estático explícito si falla la red
         return "https://media.tenor.com/images/3f822e11894a4f895c1a89c2fa7c858b/tenor.gif";
     } else {
-        // 1. Nekos.best SFW
         const dataNekos = await safeFetchJson(`https://nekos.best/api/v2/${action}`);
         if (dataNekos && dataNekos.results && dataNekos.results[0]?.url) {
             return dataNekos.results[0].url;
         }
 
-        // 2. Waifu.pics SFW
         const dataWaifu = await safeFetchJson(`https://api.waifu.pics/sfw/${action}`);
         if (dataWaifu && dataWaifu.url) return dataWaifu.url;
 
-        // Backup SFW
         return "https://media.tenor.com/images/10i5d1xXpS9tG/giphy.mp4";
+    }
+}
+
+// Función para descargar y enviar el GIF correctamente bufferizado para que WhatsApp lo reproduzca siempre
+async function sendGifAction(sock, from, m, action, isNsfw, captionText, mentionedJid) {
+    try {
+        const gifUrl = await fetchActionGifUrl(action, isNsfw);
+        const response = await fetch(gifUrl);
+        if (!response.ok) throw new Error("Fallo al descargar buffer de gif");
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+
+        await sock.sendMessage(from, { 
+            video: buffer, 
+            gifPlayback: true, 
+            mimetype: 'video/mp4',
+            caption: captionText, 
+            contextInfo: { mentionedJid: mentionedJid.length > 0 ? mentionedJid : [] } 
+        }, { quoted: m });
+    } catch (e) {
+        await sock.sendMessage(from, { text: captionText, contextInfo: { mentionedJid } }, { quoted: m });
     }
 }
 
@@ -128,12 +140,11 @@ async function connectToWhatsApp() {
         } else if (connection === 'open') {
             console.log(`\n¡${BOT_NAME} v${BOT_VERSION} está en línea y conectada permanentemente! ✅\n`);
             
-            // Anuncio automático de actualización al canal oficial
             try {
-                const updateMessage = `🚀 *¡${BOT_NAME} se ha actualizado a la Versión ${BOT_VERSION}!* 💚\n\n✨ Novedades:\n• Corrección de errores DNS (ENOTFOUND) en petición de GIFs.\n• Sistema de conexión multicanal para GIFs SFW/NSFW sin caídas.\n\nSigue el canal oficial: ${CHANNEL_LINK}`;
+                const updateMessage = `🚀 *¡${BOT_NAME} se ha actualizado a la Versión ${BOT_VERSION}!* 💚\n\n✨ Novedades:\n• Corrección en la reproducción de GIFs animados (buffer directo para evitar botones estáticos en WhatsApp).\n• Incremento a versión 1.1.1.\n\nSigue el canal oficial: ${CHANNEL_LINK}`;
                 await sock.sendMessage(CHANNEL_JID, { text: updateMessage });
             } catch (e) {
-                console.log("ℹ️ Conectado. (Aviso de actualización v1.1.0 preparado para el canal).");
+                console.log("ℹ️ Conectado. (Aviso de actualización v1.1.1 preparado para el canal).");
             }
         }
     });
@@ -376,17 +387,7 @@ async function connectToWhatsApp() {
                 case 'poke':
                 case 'hit':
                     const targetUser = mentionedJid[0] ? `@${mentionedJid[0].split('@')[0]}` : 'alguien';
-                    try {
-                        const gifUrl = await fetchActionGifUrl(command, false);
-                        await sock.sendMessage(from, { 
-                            video: { url: gifUrl }, 
-                            gifPlayback: true, 
-                            caption: `✨ Acción *${command.toUpperCase()}* hacia${targetUser}.`, 
-                            contextInfo: { mentionedJid: mentionedJid[0] ? [mentionedJid[0]] : [] } 
-                        }, { quoted: m });
-                    } catch (e) {
-                        await sock.sendMessage(from, { text: `✨ Acción *${command.toUpperCase()}* hacia${targetUser}.`, contextInfo: { mentionedJid } }, { quoted: m });
-                    }
+                    await sendGifAction(sock, from, m, command, false, `✨ Acción *${command.toUpperCase()}* hacia${targetUser}.`, mentionedJid);
                     break;
 
                 case 'trap':
@@ -399,17 +400,7 @@ async function connectToWhatsApp() {
                     }
                     const nsfwAction = command === 'nsfw_kiss' ? 'kiss' : command;
                     const targetNsfwUser = mentionedJid[0] ? `@${mentionedJid[0].split('@')[0]}` : 'alguien';
-                    try {
-                        const nsfwGifUrl = await fetchActionGifUrl(nsfwAction, true);
-                        await sock.sendMessage(from, { 
-                            video: { url: nsfwGifUrl }, 
-                            gifPlayback: true, 
-                            caption: `🔞 Acción adulta *${command.toUpperCase()}* hacia${targetNsfwUser}.`, 
-                            contextInfo: { mentionedJid: mentionedJid[0] ? [mentionedJid[0]] : [] } 
-                        }, { quoted: m });
-                    } catch (e) {
-                        await sock.sendMessage(from, { text: `🔞 Acción adulta *${command.toUpperCase()}*.` }, { quoted: m });
-                    }
+                    await sendGifAction(sock, from, m, nsfwAction, true, `🔞 Acción adulta *${command.toUpperCase()}* hacia${targetNsfwUser}.`, mentionedJid);
                     break;
 
                 case 'nsfw':
