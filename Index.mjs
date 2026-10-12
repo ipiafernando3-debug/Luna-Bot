@@ -1,4 +1,4 @@
-import { makeWASocket, useMultiFileAuthState, DisconnectReason, Browsers } from '@whiskeysockets/baileys';
+import { makeWASocket, useMultiFileAuthState, DisconnectReason, Browsers, downloadContentFromMessage } from '@whiskeysockets/baileys';
 import pino from 'pino';
 import fs from 'fs';
 import { exec } from 'child_process';
@@ -6,11 +6,24 @@ import readline from 'readline';
 
 const BOT_NAME = "Luna Bot";
 const BOT_OWNER = "Benjamin";
+const BOT_AVATAR = "https://i.imgur.com/v8ZpM0M.jpeg"; // Imagen de la chica anime de cabello verde
 const CHANNEL_LINK = "Sigue el canal de Luna BOT en WhatsApp: https://whatsapp.com/channel/0029VbE6xIIJP20w9b02kz1p";
 
 const nsfwStatus = {}; 
 const botStatus = {}; 
 const userProfiles = {}; 
+
+// Repositorio de GIFs ordenados por acción
+const actionGifs = {
+    kiss: ["https://media.giphy.com/media/G3va39rn8E4A8/giphy.gif", "https://media.giphy.com/media/Fq2v3qUjS64uM/giphy.gif"],
+    hug: ["https://media.giphy.com/media/lrr9350bs6vAs/giphy.gif", "https://media.giphy.com/media/143v0Z4767T15/giphy.gif"],
+    pat: ["https://media.giphy.com/media/109A593DY6T3G/giphy.gif", "https://media.giphy.com/media/5tmRHwksqWs32/giphy.gif"],
+    slap: ["https://media.giphy.com/media/Gf3AUz3eBNbTW/giphy.gif", "https://media.giphy.com/media/1081W83mRNw4k/giphy.gif"],
+    hit: ["https://media.giphy.com/media/l1J3pTFI5AR38TXA4/giphy.gif"],
+    kill: ["https://media.giphy.com/media/i8eP9FfThZp6M/giphy.gif"],
+    dance: ["https://media.giphy.com/media/10i5d1xXpS9tG/giphy.gif"],
+    cry: ["https://media.giphy.com/media/ROF8OQvDmxytW/giphy.gif"]
+};
 
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 const question = (text) => new Promise((resolve) => rl.question(text, resolve));
@@ -32,6 +45,12 @@ function downloadMediaWithYtDlp(url, outputPath, format = 'mp4') {
             }
         });
     });
+}
+
+function getRandomGif(action) {
+    const gifs = actionGifs[action];
+    if (!gifs || gifs.length === 0) return "https://media.giphy.com/media/10i5d1xXpS9tG/giphy.gif";
+    return gifs[Math.floor(Math.random() * gifs.length)];
 }
 
 async function connectToWhatsApp() {
@@ -93,6 +112,8 @@ async function connectToWhatsApp() {
             ? m.message.conversation 
             : messageType === 'extendedTextMessage' 
             ? m.message.extendedTextMessage.text 
+            : messageType === 'imageMessage'
+            ? m.message.imageMessage.caption || ''
             : '';
 
         if (body.startsWith('.') || body.startsWith('!')) {
@@ -112,6 +133,8 @@ async function connectToWhatsApp() {
                                      `  • \`.welcome\` | \`.bye\`\n\n` +
                                      `🤖 *SubBot*\n` +
                                      `  • \`.code [número]\`\n\n` +
+                                     `📷 *Multimedia*\n` +
+                                     `  • \`.sticker [texto opcional]\` (Envía o responde a una imagen)\n\n` +
                                      `👤 *Perfil*\n` +
                                      `  • \`.join\` | \`.out\` | \`.perfil\` | \`.coins\`\n\n` +
                                      `⛩️ *Anime*\n` +
@@ -129,7 +152,100 @@ async function connectToWhatsApp() {
                                      `📢 *Canal Oficial*\n` +
                                      `  • ${CHANNEL_LINK}`;
 
-                    await sock.sendMessage(from, { text: menuText }, { quoted: m });
+                    await sock.sendMessage(from, { 
+                        image: { url: BOT_AVATAR }, 
+                        caption: menuText 
+                    }, { quoted: m });
+                    break;
+
+                case 'sticker':
+                case 'stiker':
+                    const isQuotedImage = m.message.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage;
+                    const isImage = m.message.imageMessage;
+                    const imgMsg = isImage || isQuotedImage;
+
+                    if (!imgMsg) {
+                        await sock.sendMessage(from, { text: '❌ Por favor envía una imagen o responde a una usando `.sticker`' }, { quoted: m });
+                        break;
+                    }
+
+                    await sock.sendMessage(from, { text: '⏳ Convirtiendo imagen a Sticker...' }, { quoted: m });
+                    try {
+                        const stream = await downloadContentFromMessage(imgMsg, 'image');
+                        let buffer = Buffer.from([]);
+                        for await (const chunk of stream) {
+                            buffer = Buffer.concat([buffer, chunk]);
+                        }
+
+                        const tempImg = `./temp_stk_${Date.now()}.jpg`;
+                        const tempWebp = `./temp_stk_${Date.now()}.webp`;
+                        fs.writeFileSync(tempImg, buffer);
+
+                        exec(`ffmpeg -i "${tempImg}" -vcodec libwebp -filter:v "scale='min(320,iw)':min(320,ih)':force_original_aspect_ratio=decrease,fps=15, pad=320:320:-1:-1:color=0x00000000" "${tempWebp}"`, async (err) => {
+                            if (err) {
+                                await sock.sendMessage(from, { sticker: buffer }, { quoted: m });
+                            } else {
+                                await sock.sendMessage(from, { sticker: fs.readFileSync(tempWebp) }, { quoted: m });
+                                if (fs.existsSync(tempWebp)) fs.unlinkSync(tempWebp);
+                            }
+                            if (fs.existsSync(tempImg)) fs.unlinkSync(tempImg);
+                        });
+                    } catch (e) {
+                        await sock.sendMessage(from, { text: '❌ Ocurrió un error al procesar el sticker.' }, { quoted: m });
+                    }
+                    break;
+
+                case 'girl':
+                    await sock.sendMessage(from, { 
+                        image: { url: BOT_AVATAR }, 
+                        caption: `💚 *Chica Anime de Cabello Verde (Mascota Oficial de ${BOT_NAME})*\n• Nombre: Luna\n• Personalidad: Divertida y lista para ayudarte.\n🖼️ Avatar oficial del bot.` 
+                    }, { quoted: m });
+                    break;
+
+                case 'hit':
+                case 'pat':
+                case 'kiss':
+                case 'hug':
+                case 'slap':
+                case 'kill':
+                case 'dance':
+                case 'cry':
+                    const targetUser = mentionedJid[0] ? `@${mentionedJid[0].split('@')[0]}` : 'alguien';
+                    const selectedGif = getRandomGif(command);
+                    await sock.sendMessage(from, { 
+                        video: { url: selectedGif }, 
+                        gifPlayback: true, 
+                        caption: `✨ Acción *${command.toUpperCase()}* hacia${targetUser}.`, 
+                        contextInfo: { mentionedJid } 
+                    }, { quoted: m });
+                    break;
+
+                case 'poke':
+                case 'tickle':
+                case 'cuddle':
+                case 'feed':
+                case 'highfive':
+                case 'bite':
+                case 'wink':
+                case 'blush':
+                case 'wave':
+                    const targetUser2 = mentionedJid[0] ? `@${mentionedJid[0].split('@')[0]}` : 'alguien';
+                    await sock.sendMessage(from, { text: `✨ Acción *${command.toUpperCase()}* hacia${targetUser2}.`, contextInfo: { mentionedJid } }, { quoted: m });
+                    break;
+
+                case 'code':
+                    if (!query) {
+                        await sock.sendMessage(from, { text: '❌ Por favor ingresa un número de teléfono. Ejemplo: `.code 573001234567`' }, { quoted: m });
+                        break;
+                    }
+                    const targetPhone = query.replace(/[^0-9]/g, '');
+                    await sock.sendMessage(from, { text: `⏳ Generando código de vinculación para *${targetPhone}*...` }, { quoted: m });
+                    try {
+                        const pairingCode = await sock.requestPairingCode(targetPhone);
+                        await sock.sendMessage(from, { text: `🔑 *Código de vinculación:* \`${pairingCode}\`\n\nÚsalo en WhatsApp -> Dispositivos vinculados -> Vincular con el número de teléfono.` }, { quoted: m });
+                    } catch (e) {
+                        await sock.sendMessage(from, { text: '❌ Error al generar el código de emparejamiento. Asegúrate de que el número sea correcto y tenga código de país.' }, { quoted: m });
+                    }
                     break;
 
                 case 'botedit':
@@ -146,21 +262,6 @@ async function connectToWhatsApp() {
                         await sock.sendMessage(from, { text: `🟢 ¡El bot ya está *encendido*!` }, { quoted: m });
                     } else {
                         await sock.sendMessage(from, { text: `ℹ️ Uso correcto: \`.bot on\` o \`.bot off\`` }, { quoted: m });
-                    }
-                    break;
-
-                case 'code':
-                    if (!query) {
-                        await sock.sendMessage(from, { text: '❌ Por favor ingresa un número de teléfono. Ejemplo: `.code 573001234567`' }, { quoted: m });
-                        break;
-                    }
-                    const targetPhone = query.replace(/[^0-9]/g, '');
-                    await sock.sendMessage(from, { text: `⏳ Generando código de vinculación para *${targetPhone}*...` }, { quoted: m });
-                    try {
-                        const pairingCode = await sock.requestPairingCode(targetPhone);
-                        await sock.sendMessage(from, { text: `🔑 *Código de vinculación:* \`${pairingCode}\`\n\nÚsalo en WhatsApp -> Dispositivos vinculados -> Vincular con el número de teléfono.` }, { quoted: m });
-                    } catch (e) {
-                        await sock.sendMessage(from, { text: '❌ Error al generar el código de emparejamiento. Asegúrate de que el número sea correcto y tenga código de país.' }, { quoted: m });
                     }
                     break;
 
@@ -216,33 +317,8 @@ async function connectToWhatsApp() {
                     await sock.sendMessage(from, { text: `🪙 Tienes *${userProfiles[senderId].coins} monedas* en tu cuenta.` }, { quoted: m });
                     break;
 
-                case 'girl':
-                    await sock.sendMessage(from, { text: `🌸 *Chica Anime*\n• Nombre: Akame\n• Edad: 19\n• Desc: Asesina experta con espada imperial.\n🖼️ https://i.imgur.com/83Z9375.jpeg` }, { quoted: m });
-                    break;
-
                 case 'boy':
                     await sock.sendMessage(from, { text: `⚡ *Chico Anime*\n• Nombre: Levi Ackerman\n• Edad: 24\n• Desc: El soldado más fuerte.\n🖼️ https://i.imgur.com/13Z9375.jpeg` }, { quoted: m });
-                    break;
-
-                case 'hit':
-                case 'pat':
-                case 'kiss':
-                case 'hug':
-                case 'slap':
-                case 'poke':
-                case 'tickle':
-                case 'cuddle':
-                case 'feed':
-                case 'highfive':
-                case 'bite':
-                case 'kill':
-                case 'wink':
-                case 'dance':
-                case 'cry':
-                case 'blush':
-                case 'wave':
-                    const targetUser = mentionedJid[0] ? `@${mentionedJid[0].split('@')[0]}` : 'alguien';
-                    await sock.sendMessage(from, { text: `✨ Acción *${command.toUpperCase()}* hacia ${targetUser}.`, contextInfo: { mentionedJid } }, { quoted: m });
                     break;
 
                 case 'work':
