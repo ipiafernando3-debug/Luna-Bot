@@ -5,9 +5,10 @@ import { exec } from 'child_process';
 import readline from 'readline';
 
 const BOT_NAME = "Luna Bot";
-const BOT_VERSION = "1.1.2";
+const BOT_VERSION = "1.1.3";
 const BOT_OWNER = "Benjamin";
-const BOT_AVATAR = "https://i.imgur.com/v8ZpM0M.jpeg"; // Luna (chica de cabello verde)
+// Enlace actualizado con la nueva imagen de Luna (chica de cabello verde)
+const BOT_AVATAR = "https://share.google/lNkQp78sZ9eG8YkhK"; 
 const CHANNEL_LINK = "https://whatsapp.com/channel/0029VbE6xIIJP20w9b02kz1p";
 const CHANNEL_JID = "120363381484218941@newsletter"; // Canal oficial de WhatsApp
 
@@ -78,7 +79,6 @@ async function fetchActionGifUrl(action, isNsfw = false) {
     }
 }
 
-// Función que descarga, procesa con ffmpeg y envía como un GIF nativo perfecto
 async function sendGifAction(sock, from, m, action, isNsfw, captionText, mentionedJid) {
     const timestamp = Date.now();
     const tempRaw = `./temp_raw_${timestamp}`;
@@ -87,7 +87,6 @@ async function sendGifAction(sock, from, m, action, isNsfw, captionText, mention
     try {
         const gifUrl = await fetchActionGifUrl(action, isNsfw);
         
-        // Usar curl para guardar el archivo multimedia en disco
         await new Promise((resolve, reject) => {
             exec(`curl -L -s -o "${tempRaw}" "${gifUrl}"`, (err) => {
                 if (err || !fs.existsSync(tempRaw)) reject(err);
@@ -95,7 +94,6 @@ async function sendGifAction(sock, from, m, action, isNsfw, captionText, mention
             });
         });
 
-        // Convertir el GIF o video descargado a MP4 ligero compatible con WhatsApp mediante ffmpeg
         await new Promise((resolve, reject) => {
             exec(`ffmpeg -i "${tempRaw}" -movflags faststart -pix_fmt yuv420p -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -f mp4 "${tempMp4}" -y`, (err) => {
                 if (!err && fs.existsSync(tempMp4)) resolve();
@@ -103,7 +101,6 @@ async function sendGifAction(sock, from, m, action, isNsfw, captionText, mention
             });
         });
 
-        // Enviar el video MP4 como GIF animado directo
         await sock.sendMessage(from, { 
             video: fs.readFileSync(tempMp4), 
             gifPlayback: true, 
@@ -115,7 +112,6 @@ async function sendGifAction(sock, from, m, action, isNsfw, captionText, mention
     } catch (e) {
         await sock.sendMessage(from, { text: captionText, contextInfo: { mentionedJid } }, { quoted: m });
     } finally {
-        // Limpieza de archivos temporales
         if (fs.existsSync(tempRaw)) fs.unlinkSync(tempRaw);
         if (fs.existsSync(tempMp4)) fs.unlinkSync(tempMp4);
     }
@@ -163,10 +159,10 @@ async function connectToWhatsApp() {
             console.log(`\n¡${BOT_NAME} v${BOT_VERSION} está en línea y conectada permanentemente! ✅\n`);
             
             try {
-                const updateMessage = `🚀 *¡${BOT_NAME} se ha actualizado a la Versión ${BOT_VERSION}!* 💚\n\n✨ Novedades:\n• Conversión nativa con ffmpeg para GIFs (se reproducen solos sin errores de archivo multimedia inexistente).\n• Eliminación de enlaces caídos.\n\nSigue el canal oficial: ${CHANNEL_LINK}`;
+                const updateMessage = `🚀 *¡${BOT_NAME} se ha actualizado a la Versión ${BOT_VERSION}!* 💚\n\n✨ Novedades:\n• Reemplazada la imagen de avatar rota de Luna por el nuevo arte oficial.\n• Corrección completa en menú y comando .girl.\n\nSigue el canal oficial: ${CHANNEL_LINK}`;
                 await sock.sendMessage(CHANNEL_JID, { text: updateMessage });
             } catch (e) {
-                console.log("ℹ️ Conectado. (Aviso de actualización v1.1.2 preparado para el canal).");
+                console.log("ℹ️ Conectado. (Aviso de actualización v1.1.3 preparado para el canal).");
             }
         }
     });
@@ -495,4 +491,4 @@ async function connectToWhatsApp() {
     });
 }
 
-connectToWhatsApp();
+connectToWhatsApp(); 
