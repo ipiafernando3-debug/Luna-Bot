@@ -5,7 +5,7 @@ import { exec } from 'child_process';
 import readline from 'readline';
 
 const BOT_NAME = "Luna Bot";
-const BOT_VERSION = "1.0.8";
+const BOT_VERSION = "1.0.9";
 const BOT_OWNER = "Benjamin";
 const BOT_AVATAR = "https://i.imgur.com/v8ZpM0M.jpeg"; // Mascotita oficial: Luna (chica de cabello verde)
 const CHANNEL_LINK = "https://whatsapp.com/channel/0029VbE6xIIJP20w9b02kz1p";
@@ -33,17 +33,37 @@ function downloadMediaWithYtDlp(url, outputPath, format = 'mp4') {
 async function fetchActionGifUrl(action, isNsfw = false) {
     try {
         if (isNsfw) {
-            const nsfwEndpoints = {
-                'blowjob': 'https://api.waifu.pics/nsfw/blowjob',
-                'trap': 'https://api.waifu.pics/nsfw/trap',
-                'cum': 'https://api.waifu.pics/nsfw/waifu',
-                'kiss': 'https://api.waifu.pics/nsfw/neko'
+            // 1. Intentar PurrBot API para contenido NSFW de anime explícito
+            try {
+                const purrMap = {
+                    'blowjob': 'https://purrbot.site/api/img/nsfw/blowjob/gif',
+                    'cum': 'https://purrbot.site/api/img/nsfw/cum/gif',
+                    'fuck': 'https://purrbot.site/api/img/nsfw/fuck/gif'
+                };
+                if (purrMap[action]) {
+                    const resPurr = await fetch(purrMap[action]);
+                    const dataPurr = await resPurr.json();
+                    if (dataPurr && !dataPurr.error && dataPurr.link) {
+                        return dataPurr.link;
+                    }
+                }
+            } catch (e) {}
+
+            // 2. Endpoints específicos NSFW en waifu.pics
+            const nsfwWaifuCategories = {
+                'blowjob': 'blowjob',
+                'trap': 'trap',
+                'cum': 'waifu',
+                'kiss': 'neko',
+                'nsfw_kiss': 'neko'
             };
-            const targetUrl = nsfwEndpoints[action] || `https://api.waifu.pics/nsfw/${action}`;
-            const res = await fetch(targetUrl);
+            const cat = nsfwWaifuCategories[action] || action;
+            const res = await fetch(`https://api.waifu.pics/nsfw/${cat}`);
             const data = await res.json();
             if (data && data.url) return data.url;
+
         } else {
+            // 1. Intentar nekos.best para GIFs SFW
             try {
                 const resNekos = await fetch(`https://nekos.best/api/v2/${action}`);
                 const dataNekos = await resNekos.json();
@@ -52,6 +72,7 @@ async function fetchActionGifUrl(action, isNsfw = false) {
                 }
             } catch (err) {}
 
+            // 2. Respaldo SFW en waifu.pics
             const res = await fetch(`https://api.waifu.pics/sfw/${action}`);
             const data = await res.json();
             if (data && data.url) return data.url;
@@ -60,11 +81,10 @@ async function fetchActionGifUrl(action, isNsfw = false) {
         console.error("Error obteniendo GIF:", e);
     }
     
-    const backupGifs = [
-        "https://media.giphy.com/media/l41fk9s7e/giphy.mp4",
-        "https://media.giphy.com/media/3o7TKSjRrfIPjeiVyM/giphy.mp4"
-    ];
-    return backupGifs[Math.floor(Math.random() * backupGifs.length)];
+    // Respaldo secundario si todo falla
+    return isNsfw 
+        ? "https://api.waifu.pics/nsfw/waifu" 
+        : "https://api.waifu.pics/sfw/hug";
 }
 
 async function connectToWhatsApp() {
@@ -110,10 +130,10 @@ async function connectToWhatsApp() {
             
             // Anuncio de actualización al canal
             try {
-                const updateMessage = `🚀 *¡${BOT_NAME} se ha actualizado a la Versión ${BOT_VERSION}!* 💚\n\n✨ Novedades:\n• Corrección y diversificación completa en GIFs de acciones SFW y NSFW.\n• Guía detallada de uso en comandos y descargas universales de APK.\n\nSigue el canal oficial: ${CHANNEL_LINK}`;
+                const updateMessage = `🚀 *¡${BOT_NAME} se ha actualizado a la Versión ${BOT_VERSION}!* 💚\n\n✨ Novedades:\n• Corrección total de GIFs NSFW explícitos de anime (eliminados gifs aleatorios no relacionados).\n• Incremento a versión 1.0.9 con mayor estabilidad.\n\nSigue el canal oficial: ${CHANNEL_LINK}`;
                 await sock.sendMessage(CHANNEL_JID, { text: updateMessage });
             } catch (e) {
-                console.log("ℹ️ Conectado. (Aviso de actualización v1.0.8 preparado para el canal).");
+                console.log("ℹ️ Conectado. (Aviso de actualización v1.0.9 preparado para el canal).");
             }
         }
     });
