@@ -5,7 +5,7 @@ import { exec } from 'child_process';
 import readline from 'readline';
 
 const BOT_NAME = "Luna Bot";
-const BOT_VERSION = "1.0.7";
+const BOT_VERSION = "1.0.8";
 const BOT_OWNER = "Benjamin";
 const BOT_AVATAR = "https://i.imgur.com/v8ZpM0M.jpeg"; // Imagen oficial de Luna (chica de cabello verde)
 const CHANNEL_LINK = "https://whatsapp.com/channel/0029VbE6xIIJP20w9b02kz1p";
