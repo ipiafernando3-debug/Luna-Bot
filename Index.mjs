@@ -5,7 +5,7 @@ import { exec } from 'child_process';
 import readline from 'readline';
 
 const BOT_NAME = "Luna Bot";
-const BOT_VERSION = "1.1.1";
+const BOT_VERSION = "1.1.2";
 const BOT_OWNER = "Benjamin";
 const BOT_AVATAR = "https://i.imgur.com/v8ZpM0M.jpeg"; // Luna (chica de cabello verde)
 const CHANNEL_LINK = "https://whatsapp.com/channel/0029VbE6xIIJP20w9b02kz1p";
@@ -33,7 +33,7 @@ function downloadMediaWithYtDlp(url, outputPath, format = 'mp4') {
 async function safeFetchJson(url) {
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 4000);
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
         const res = await fetch(url, { signal: controller.signal });
         clearTimeout(timeoutId);
         if (res.ok) return await res.json();
@@ -64,7 +64,7 @@ async function fetchActionGifUrl(action, isNsfw = false) {
         const dataWaifu = await safeFetchJson(`https://api.waifu.pics/nsfw/${cat}`);
         if (dataWaifu && dataWaifu.url) return dataWaifu.url;
 
-        return "https://media.tenor.com/images/3f822e11894a4f895c1a89c2fa7c858b/tenor.gif";
+        return "https://api.waifu.pics/nsfw/waifu";
     } else {
         const dataNekos = await safeFetchJson(`https://nekos.best/api/v2/${action}`);
         if (dataNekos && dataNekos.results && dataNekos.results[0]?.url) {
@@ -74,28 +74,50 @@ async function fetchActionGifUrl(action, isNsfw = false) {
         const dataWaifu = await safeFetchJson(`https://api.waifu.pics/sfw/${action}`);
         if (dataWaifu && dataWaifu.url) return dataWaifu.url;
 
-        return "https://media.tenor.com/images/10i5d1xXpS9tG/giphy.mp4";
+        return "https://api.waifu.pics/sfw/hug";
     }
 }
 
-// Función para descargar y enviar el GIF correctamente bufferizado para que WhatsApp lo reproduzca siempre
+// Función que descarga, procesa con ffmpeg y envía como un GIF nativo perfecto
 async function sendGifAction(sock, from, m, action, isNsfw, captionText, mentionedJid) {
+    const timestamp = Date.now();
+    const tempRaw = `./temp_raw_${timestamp}`;
+    const tempMp4 = `./temp_gif_${timestamp}.mp4`;
+
     try {
         const gifUrl = await fetchActionGifUrl(action, isNsfw);
-        const response = await fetch(gifUrl);
-        if (!response.ok) throw new Error("Fallo al descargar buffer de gif");
-        const arrayBuffer = await response.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
+        
+        // Usar curl para guardar el archivo multimedia en disco
+        await new Promise((resolve, reject) => {
+            exec(`curl -L -s -o "${tempRaw}" "${gifUrl}"`, (err) => {
+                if (err || !fs.existsSync(tempRaw)) reject(err);
+                else resolve();
+            });
+        });
 
+        // Convertir el GIF o video descargado a MP4 ligero compatible con WhatsApp mediante ffmpeg
+        await new Promise((resolve, reject) => {
+            exec(`ffmpeg -i "${tempRaw}" -movflags faststart -pix_fmt yuv420p -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -f mp4 "${tempMp4}" -y`, (err) => {
+                if (!err && fs.existsSync(tempMp4)) resolve();
+                else reject(err);
+            });
+        });
+
+        // Enviar el video MP4 como GIF animado directo
         await sock.sendMessage(from, { 
-            video: buffer, 
+            video: fs.readFileSync(tempMp4), 
             gifPlayback: true, 
             mimetype: 'video/mp4',
             caption: captionText, 
             contextInfo: { mentionedJid: mentionedJid.length > 0 ? mentionedJid : [] } 
         }, { quoted: m });
+
     } catch (e) {
         await sock.sendMessage(from, { text: captionText, contextInfo: { mentionedJid } }, { quoted: m });
+    } finally {
+        // Limpieza de archivos temporales
+        if (fs.existsSync(tempRaw)) fs.unlinkSync(tempRaw);
+        if (fs.existsSync(tempMp4)) fs.unlinkSync(tempMp4);
     }
 }
 
@@ -141,10 +163,10 @@ async function connectToWhatsApp() {
             console.log(`\n¡${BOT_NAME} v${BOT_VERSION} está en línea y conectada permanentemente! ✅\n`);
             
             try {
-                const updateMessage = `🚀 *¡${BOT_NAME} se ha actualizado a la Versión ${BOT_VERSION}!* 💚\n\n✨ Novedades:\n• Corrección en la reproducción de GIFs animados (buffer directo para evitar botones estáticos en WhatsApp).\n• Incremento a versión 1.1.1.\n\nSigue el canal oficial: ${CHANNEL_LINK}`;
+                const updateMessage = `🚀 *¡${BOT_NAME} se ha actualizado a la Versión ${BOT_VERSION}!* 💚\n\n✨ Novedades:\n• Conversión nativa con ffmpeg para GIFs (se reproducen solos sin errores de archivo multimedia inexistente).\n• Eliminación de enlaces caídos.\n\nSigue el canal oficial: ${CHANNEL_LINK}`;
                 await sock.sendMessage(CHANNEL_JID, { text: updateMessage });
             } catch (e) {
-                console.log("ℹ️ Conectado. (Aviso de actualización v1.1.1 preparado para el canal).");
+                console.log("ℹ️ Conectado. (Aviso de actualización v1.1.2 preparado para el canal).");
             }
         }
     });
