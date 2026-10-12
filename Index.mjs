@@ -2,6 +2,7 @@ import { makeWASocket, useMultiFileAuthState, DisconnectReason, Browsers } from 
 import pino from 'pino';
 import fs from 'fs';
 import { exec } from 'child_process';
+import readline from 'readline';
 
 const BOT_NAME = "Luna Bot";
 const BOT_OWNER = "Benjamin";
@@ -9,6 +10,10 @@ const BOT_OWNER = "Benjamin";
 const nsfwStatus = {}; 
 const botStatus = {}; 
 const userProfiles = {}; 
+
+// Configuración para leer el número de teléfono desde la consola de Termux
+const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+const question = (text) => new Promise((resolve) => rl.question(text, resolve));
 
 function downloadMediaWithYtDlp(url, outputPath, format = 'mp4') {
     return new Promise((resolve, reject) => {
@@ -34,10 +39,26 @@ async function connectToWhatsApp() {
 
     const sock = makeWASocket({
         auth: state,
-        printQRInTerminal: true, // <-- Activado para mostrar el código QR en Termux
+        printQRInTerminal: false, // Desactivado para usar el código de emparejamiento numérico
         browser: Browsers.ubuntu('Chrome'),
         logger: pino({ level: 'silent' })
     });
+
+    // Solicitar número de teléfono si no hay sesión registrada para dar el código de 8 dígitos
+    if (!sock.authState.creds.registered) {
+        const phoneNumber = await question('\n📱 Ingresa tu número de WhatsApp con código de país (ejemplo: 573001234567): ');
+        const cleanNumber = phoneNumber.replace(/[^0-9]/g, '');
+        
+        setTimeout(async () => {
+            try {
+                const code = await sock.requestPairingCode(cleanNumber);
+                console.log(`\n🔑 Tu código de vinculación para WhatsApp es: \x1b[32m${code}\x1b[0m\n`);
+                console.log('Ingresa este código en tu WhatsApp -> Dispositivos vinculados -> Vincular con el número de teléfono.\n');
+            } catch (err) {
+                console.error('❌ Error al solicitar el código de vinculación:', err);
+            }
+        }, 3000);
+    }
 
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect } = update;
