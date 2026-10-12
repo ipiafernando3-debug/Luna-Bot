@@ -5,11 +5,11 @@ import { exec } from 'child_process';
 import readline from 'readline';
 
 const BOT_NAME = "Luna Bot";
-const BOT_VERSION = "1.0.9";
+const BOT_VERSION = "1.1.0";
 const BOT_OWNER = "Benjamin";
-const BOT_AVATAR = "https://i.imgur.com/v8ZpM0M.jpeg"; // Mascotita oficial: Luna (chica de cabello verde)
+const BOT_AVATAR = "https://i.imgur.com/v8ZpM0M.jpeg"; // Luna (chica de cabello verde)
 const CHANNEL_LINK = "https://whatsapp.com/channel/0029VbE6xIIJP20w9b02kz1p";
-const CHANNEL_JID = "120363381484218941@newsletter"; // Canal oficial para avisos
+const CHANNEL_JID = "120363381484218941@newsletter"; // Canal oficial de WhatsApp
 
 const nsfwStatus = {}; 
 const botStatus = {}; 
@@ -30,61 +30,61 @@ function downloadMediaWithYtDlp(url, outputPath, format = 'mp4') {
     });
 }
 
-async function fetchActionGifUrl(action, isNsfw = false) {
+// Función con fallback en cadena resistente a errores de DNS (ENOTFOUND)
+async function safeFetchJson(url) {
     try {
-        if (isNsfw) {
-            // 1. Intentar PurrBot API para contenido NSFW de anime explícito
-            try {
-                const purrMap = {
-                    'blowjob': 'https://purrbot.site/api/img/nsfw/blowjob/gif',
-                    'cum': 'https://purrbot.site/api/img/nsfw/cum/gif',
-                    'fuck': 'https://purrbot.site/api/img/nsfw/fuck/gif'
-                };
-                if (purrMap[action]) {
-                    const resPurr = await fetch(purrMap[action]);
-                    const dataPurr = await resPurr.json();
-                    if (dataPurr && !dataPurr.error && dataPurr.link) {
-                        return dataPurr.link;
-                    }
-                }
-            } catch (e) {}
-
-            // 2. Endpoints específicos NSFW en waifu.pics
-            const nsfwWaifuCategories = {
-                'blowjob': 'blowjob',
-                'trap': 'trap',
-                'cum': 'waifu',
-                'kiss': 'neko',
-                'nsfw_kiss': 'neko'
-            };
-            const cat = nsfwWaifuCategories[action] || action;
-            const res = await fetch(`https://api.waifu.pics/nsfw/${cat}`);
-            const data = await res.json();
-            if (data && data.url) return data.url;
-
-        } else {
-            // 1. Intentar nekos.best para GIFs SFW
-            try {
-                const resNekos = await fetch(`https://nekos.best/api/v2/${action}`);
-                const dataNekos = await resNekos.json();
-                if (dataNekos && dataNekos.results && dataNekos.results[0]?.url) {
-                    return dataNekos.results[0].url;
-                }
-            } catch (err) {}
-
-            // 2. Respaldo SFW en waifu.pics
-            const res = await fetch(`https://api.waifu.pics/sfw/${action}`);
-            const data = await res.json();
-            if (data && data.url) return data.url;
-        }
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4000); // 4 segs tiempo límite
+        const res = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        if (res.ok) return await res.json();
     } catch (e) {
-        console.error("Error obteniendo GIF:", e);
+        // Ignora errores de DNS/conexión silenciosamente
     }
-    
-    // Respaldo secundario si todo falla
-    return isNsfw 
-        ? "https://api.waifu.pics/nsfw/waifu" 
-        : "https://api.waifu.pics/sfw/hug";
+    return null;
+}
+
+async function fetchActionGifUrl(action, isNsfw = false) {
+    if (isNsfw) {
+        // 1. PurrBot API
+        const purrEndpoints = {
+            'blowjob': 'https://purrbot.site/api/img/nsfw/blowjob/gif',
+            'cum': 'https://purrbot.site/api/img/nsfw/cum/gif',
+            'fuck': 'https://purrbot.site/api/img/nsfw/fuck/gif'
+        };
+        if (purrEndpoints[action]) {
+            const dataPurr = await safeFetchJson(purrEndpoints[action]);
+            if (dataPurr && !dataPurr.error && dataPurr.link) return dataPurr.link;
+        }
+
+        // 2. Waifu.pics NSFW
+        const nsfwCategories = {
+            'blowjob': 'blowjob',
+            'trap': 'trap',
+            'cum': 'waifu',
+            'kiss': 'neko',
+            'nsfw_kiss': 'neko'
+        };
+        const cat = nsfwCategories[action] || 'waifu';
+        const dataWaifu = await safeFetchJson(`https://api.waifu.pics/nsfw/${cat}`);
+        if (dataWaifu && dataWaifu.url) return dataWaifu.url;
+
+        // Backup estático explícito si falla la red
+        return "https://media.tenor.com/images/3f822e11894a4f895c1a89c2fa7c858b/tenor.gif";
+    } else {
+        // 1. Nekos.best SFW
+        const dataNekos = await safeFetchJson(`https://nekos.best/api/v2/${action}`);
+        if (dataNekos && dataNekos.results && dataNekos.results[0]?.url) {
+            return dataNekos.results[0].url;
+        }
+
+        // 2. Waifu.pics SFW
+        const dataWaifu = await safeFetchJson(`https://api.waifu.pics/sfw/${action}`);
+        if (dataWaifu && dataWaifu.url) return dataWaifu.url;
+
+        // Backup SFW
+        return "https://media.tenor.com/images/10i5d1xXpS9tG/giphy.mp4";
+    }
 }
 
 async function connectToWhatsApp() {
@@ -128,12 +128,12 @@ async function connectToWhatsApp() {
         } else if (connection === 'open') {
             console.log(`\n¡${BOT_NAME} v${BOT_VERSION} está en línea y conectada permanentemente! ✅\n`);
             
-            // Anuncio de actualización al canal
+            // Anuncio automático de actualización al canal oficial
             try {
-                const updateMessage = `🚀 *¡${BOT_NAME} se ha actualizado a la Versión ${BOT_VERSION}!* 💚\n\n✨ Novedades:\n• Corrección total de GIFs NSFW explícitos de anime (eliminados gifs aleatorios no relacionados).\n• Incremento a versión 1.0.9 con mayor estabilidad.\n\nSigue el canal oficial: ${CHANNEL_LINK}`;
+                const updateMessage = `🚀 *¡${BOT_NAME} se ha actualizado a la Versión ${BOT_VERSION}!* 💚\n\n✨ Novedades:\n• Corrección de errores DNS (ENOTFOUND) en petición de GIFs.\n• Sistema de conexión multicanal para GIFs SFW/NSFW sin caídas.\n\nSigue el canal oficial: ${CHANNEL_LINK}`;
                 await sock.sendMessage(CHANNEL_JID, { text: updateMessage });
             } catch (e) {
-                console.log("ℹ️ Conectado. (Aviso de actualización v1.0.9 preparado para el canal).");
+                console.log("ℹ️ Conectado. (Aviso de actualización v1.1.0 preparado para el canal).");
             }
         }
     });
