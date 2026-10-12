@@ -34,7 +34,7 @@ async function connectToWhatsApp() {
 
     const sock = makeWASocket({
         auth: state,
-        printQRInTerminal: false,
+        printQRInTerminal: true, // <-- Activado para mostrar el código QR en Termux
         browser: Browsers.ubuntu('Chrome'),
         logger: pino({ level: 'silent' })
     });
