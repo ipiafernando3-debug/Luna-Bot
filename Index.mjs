@@ -3,27 +3,16 @@ import pino from 'pino';
 import fs from 'fs';
 import { exec } from 'child_process';
 import readline from 'readline';
+import Sticker, { StickerTypes } from 'wa-sticker-formatter';
 
 const BOT_NAME = "Luna Bot";
 const BOT_OWNER = "Benjamin";
-const BOT_AVATAR = "https://i.imgur.com/v8ZpM0M.jpeg"; // Chica anime de cabello verde
+const BOT_AVATAR = "https://i.imgur.com/v8ZpM0M.jpeg";
 const CHANNEL_LINK = "Sigue el canal de Luna BOT en WhatsApp: https://whatsapp.com/channel/0029VbE6xIIJP20w9b02kz1p";
 
 const nsfwStatus = {}; 
 const botStatus = {}; 
 const userProfiles = {}; 
-
-// Repositorio de GIFs ordenados por acción
-const actionGifs = {
-    kiss: ["https://media.giphy.com/media/G3va39rn8E4A8/giphy.mp4", "https://media.giphy.com/media/Fq2v3qUjS64uM/giphy.mp4"],
-    hug: ["https://media.giphy.com/media/lrr9350bs6vAs/giphy.mp4", "https://media.giphy.com/media/143v0Z4767T15/giphy.mp4"],
-    pat: ["https://media.giphy.com/media/109A593DY6T3G/giphy.mp4", "https://media.giphy.com/media/5tmRHwksqWs32/giphy.mp4"],
-    slap: ["https://media.giphy.com/media/Gf3AUz3eBNbTW/giphy.mp4", "https://media.giphy.com/media/1081W83mRNw4k/giphy.mp4"],
-    hit: ["https://media.giphy.com/media/l1J3pTFI5AR38TXA4/giphy.mp4"],
-    kill: ["https://media.giphy.com/media/i8eP9FfThZp6M/giphy.mp4"],
-    dance: ["https://media.giphy.com/media/10i5d1xXpS9tG/giphy.mp4"],
-    cry: ["https://media.giphy.com/media/ROF8OQvDmxytW/giphy.mp4"]
-};
 
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 const question = (text) => new Promise((resolve) => rl.question(text, resolve));
@@ -34,26 +23,24 @@ function downloadMediaWithYtDlp(url, outputPath, format = 'mp4') {
         const command = `yt-dlp --no-check-certificate --geo-bypass ${flag} -o "${outputPath}" "${url}"`;
         
         exec(command, { maxBuffer: 1024 * 1024 * 150 }, (error, stdout, stderr) => {
-            if (error) {
-                reject(error);
-            } else {
-                if (fs.existsSync(outputPath)) {
-                    resolve(outputPath);
-                } else {
-                    reject(new Error("El archivo no se generó."));
-                }
-            }
+            if (error) reject(error);
+            else fs.existsSync(outputPath) ? resolve(outputPath) : reject(new Error("El archivo no se generó."));
         });
     });
 }
 
-function getRandomGif(action) {
-    const gifs = actionGifs[action];
-    if (!gifs || gifs.length === 0) return "https://media.giphy.com/media/10i5d1xXpS9tG/giphy.mp4";
-    return gifs[Math.floor(Math.random() * gifs.length)];
+async function fetchActionGifUrl(action) {
+    try {
+        const response = await fetch(`https://api.waifu.pics/sfw/${action}`);
+        const data = await response.json();
+        return data.url;
+    } catch (e) {
+        return "https://media.giphy.com/media/10i5d1xXpS9tG/giphy.mp4";
+    }
 }
 
 async function connectToWhatsApp() {
+    // Carga o crea las credenciales guardadas en la carpeta auth_info_baileys
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
 
     const sock = makeWASocket({
@@ -63,28 +50,38 @@ async function connectToWhatsApp() {
         logger: pino({ level: 'silent' })
     });
 
+    // SOLO si NUNCA se ha registrado ni vinculado el número, pedirá el número de teléfono
     if (!sock.authState.creds.registered) {
-        const phoneNumber = await question('\n📱 Ingresa tu número de WhatsApp con código de país (ejemplo: 573001234567): ');
+        console.log('\n📱 Iniciando primera vinculación de sesión...');
+        const phoneNumber = await question('👉 Ingresa tu número de WhatsApp con código de país (ejemplo: 573001234567): ');
         const cleanNumber = phoneNumber.replace(/[^0-9]/g, '');
         
         setTimeout(async () => {
             try {
                 const code = await sock.requestPairingCode(cleanNumber);
                 console.log(`\n🔑 Tu código de vinculación para WhatsApp es: \x1b[32m${code}\x1b[0m\n`);
-                console.log('Ingresa este código en tu WhatsApp -> Dispositivos vinculados -> Vincular con el número de teléfono.\n');
+                console.log('Ingresa este código en WhatsApp -> Dispositivos vinculados -> Vincular con el número de teléfono.\n');
             } catch (err) {
                 console.error('❌ Error al solicitar el código de vinculación:', err);
             }
         }, 3000);
+    } else {
+        console.log('\n🔄 Sesión previa detectada. Conectando a WhatsApp directamente...');
     }
 
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect } = update;
         if (connection === 'close') {
-            const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-            if (shouldReconnect) connectToWhatsApp();
+            const statusCode = lastDisconnect?.error?.output?.statusCode;
+            const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+            console.log(`⚠️ Conexión cerrada. Reconectando: ${shouldReconnect}`);
+            if (shouldReconnect) {
+                connectToWhatsApp();
+            } else {
+                console.log('❌ Sesión cerrada por WhatsApp. Borra la carpeta auth_info_baileys para volver a vincular.');
+            }
         } else if (connection === 'open') {
-            console.log(`\n¡${BOT_NAME} está en línea y con todas sus funciones activas! ✅\n`);
+            console.log(`\n¡${BOT_NAME} está en línea y conectada permanentemente! ✅\n`);
         }
     });
 
@@ -156,38 +153,6 @@ async function connectToWhatsApp() {
                     await sock.sendMessage(from, { image: { url: BOT_AVATAR }, caption: menuText }, { quoted: m });
                     break;
 
-                case 'botedit':
-                    await sock.sendMessage(from, { text: `⚙️ Configuración de ${BOT_NAME} operando bajo el propietario *${BOT_OWNER}*.` }, { quoted: m });
-                    break;
-
-                case 'bot':
-                    const estadoArg = args[0]?.toLowerCase();
-                    if (estadoArg === 'off') {
-                        botStatus[from] = false;
-                        await sock.sendMessage(from, { text: `🔴 El bot ha sido *apagado* en este chat. Usa \`.bot on\` para reactivarlo.` }, { quoted: m });
-                    } else if (estadoArg === 'on') {
-                        botStatus[from] = true;
-                        await sock.sendMessage(from, { text: `🟢 ¡El bot ya está *encendido*!` }, { quoted: m });
-                    } else {
-                        await sock.sendMessage(from, { text: `ℹ️ Uso correcto: \`.bot on\` o \`.bot off\`` }, { quoted: m });
-                    }
-                    break;
-
-                case 'code':
-                    if (!query) {
-                        await sock.sendMessage(from, { text: '❌ Por favor ingresa un número de teléfono. Ejemplo: `.code 573001234567`' }, { quoted: m });
-                        break;
-                    }
-                    const targetPhone = query.replace(/[^0-9]/g, '');
-                    await sock.sendMessage(from, { text: `⏳ Generando código de vinculación para *${targetPhone}*...` }, { quoted: m });
-                    try {
-                        const pairingCode = await sock.requestPairingCode(targetPhone);
-                        await sock.sendMessage(from, { text: `🔑 *Código de vinculación:* \`${pairingCode}\`\n\nÚsalo en WhatsApp -> Dispositivos vinculados -> Vincular con el número de teléfono.` }, { quoted: m });
-                    } catch (e) {
-                        await sock.sendMessage(from, { text: '❌ Error al generar el código de emparejamiento. Asegúrate de que el número sea correcto y tenga código de país.' }, { quoted: m });
-                    }
-                    break;
-
                 case 'sticker':
                 case 'stiker':
                 case 's':
@@ -214,21 +179,83 @@ async function connectToWhatsApp() {
                             { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage }
                         );
 
-                        const tempIn = `./temp_stk_${Date.now()}`;
-                        const tempOut = `./temp_stk_${Date.now()}.webp`;
-                        fs.writeFileSync(tempIn, buffer);
-
-                        exec(`ffmpeg -i "${tempIn}" -vcodec libwebp -filter:v "scale='min(512,iw)':min(512,ih)':force_original_aspect_ratio=decrease,fps=15,pad=512:512:-1:-1:color=0x00000000" "${tempOut}"`, async (err) => {
-                            if (!err && fs.existsSync(tempOut)) {
-                                await sock.sendMessage(from, { sticker: fs.readFileSync(tempOut) }, { quoted: m });
-                                fs.unlinkSync(tempOut);
-                            } else {
-                                await sock.sendMessage(from, { sticker: buffer }, { quoted: m });
-                            }
-                            if (fs.existsSync(tempIn)) fs.unlinkSync(tempIn);
+                        const sticker = new Sticker(buffer, {
+                            pack: 'Luna Bot',
+                            author: 'Benjamin',
+                            type: StickerTypes.FULL,
+                            quality: 70
                         });
+
+                        const stickerBuffer = await sticker.toBuffer();
+                        await sock.sendMessage(from, { sticker: stickerBuffer }, { quoted: m });
                     } catch (e) {
+                        console.error("Error sticker:", e);
                         await sock.sendMessage(from, { text: '❌ Ocurrió un error al procesar el sticker.' }, { quoted: m });
+                    }
+                    break;
+
+                case 'hit':
+                case 'pat':
+                case 'kiss':
+                case 'hug':
+                case 'slap':
+                case 'kill':
+                case 'dance':
+                case 'cry':
+                case 'poke':
+                case 'tickle':
+                case 'cuddle':
+                case 'feed':
+                case 'highfive':
+                case 'bite':
+                case 'wink':
+                case 'blush':
+                case 'wave':
+                    const targetUser = mentionedJid[0] ? `@${mentionedJid[0].split('@')[0]}` : 'alguien';
+                    const validAction = ['kiss', 'hug', 'pat', 'slap', 'kill', 'dance', 'cry', 'poke', 'bite', 'wink', 'wave', 'blush', 'hit'].includes(command) ? command : 'pat';
+                    
+                    try {
+                        const gifUrl = await fetchActionGifUrl(validAction);
+                        await sock.sendMessage(from, { 
+                            video: { url: gifUrl }, 
+                            gifPlayback: true, 
+                            caption: `✨ Acción *${command.toUpperCase()}* hacia${targetUser}.`, 
+                            contextInfo: { mentionedJid: mentionedJid[0] ? [mentionedJid[0]] : [] } 
+                        }, { quoted: m });
+                    } catch (e) {
+                        await sock.sendMessage(from, { text: `✨ Acción *${command.toUpperCase()}* hacia${targetUser}.`, contextInfo: { mentionedJid } }, { quoted: m });
+                    }
+                    break;
+
+                case 'code':
+                    if (!query) {
+                        await sock.sendMessage(from, { text: '❌ Por favor ingresa un número de teléfono. Ejemplo: `.code 573001234567`' }, { quoted: m });
+                        break;
+                    }
+                    const targetPhone = query.replace(/[^0-9]/g, '');
+                    await sock.sendMessage(from, { text: `⏳ Generando código de vinculación para *${targetPhone}*...` }, { quoted: m });
+                    try {
+                        const pairingCode = await sock.requestPairingCode(targetPhone);
+                        await sock.sendMessage(from, { text: `🔑 *Código de vinculación:* \`${pairingCode}\`\n\nÚsalo en WhatsApp -> Dispositivos vinculados -> Vincular con el número de teléfono.` }, { quoted: m });
+                    } catch (e) {
+                        await sock.sendMessage(from, { text: '❌ Error al generar el código de emparejamiento. Asegúrate de que el número sea correcto y tenga código de país.' }, { quoted: m });
+                    }
+                    break;
+
+                case 'botedit':
+                    await sock.sendMessage(from, { text: `⚙️ Configuración de ${BOT_NAME} operando bajo el propietario *${BOT_OWNER}*.` }, { quoted: m });
+                    break;
+
+                case 'bot':
+                    const estadoArg = args[0]?.toLowerCase();
+                    if (estadoArg === 'off') {
+                        botStatus[from] = false;
+                        await sock.sendMessage(from, { text: `🔴 El bot ha sido *apagado* en este chat. Usa \`.bot on\` para reactivarlo.` }, { quoted: m });
+                    } else if (estadoArg === 'on') {
+                        botStatus[from] = true;
+                        await sock.sendMessage(from, { text: `🟢 ¡El bot ya está *encendido*!` }, { quoted: m });
+                    } else {
+                        await sock.sendMessage(from, { text: `ℹ️ Uso correcto: \`.bot on\` o \`.bot off\`` }, { quoted: m });
                     }
                     break;
 
@@ -293,37 +320,6 @@ async function connectToWhatsApp() {
 
                 case 'boy':
                     await sock.sendMessage(from, { text: `⚡ *Chico Anime*\n• Nombre: Levi Ackerman\n• Edad: 24\n• Desc: El soldado más fuerte.\n🖼️ https://i.imgur.com/13Z9375.jpeg` }, { quoted: m });
-                    break;
-
-                case 'hit':
-                case 'pat':
-                case 'kiss':
-                case 'hug':
-                case 'slap':
-                case 'kill':
-                case 'dance':
-                case 'cry':
-                case 'poke':
-                case 'tickle':
-                case 'cuddle':
-                case 'feed':
-                case 'highfive':
-                case 'bite':
-                case 'wink':
-                case 'blush':
-                case 'wave':
-                    const targetUser = mentionedJid[0] ? `@${mentionedJid[0].split('@')[0]}` : 'alguien';
-                    const selectedGif = getRandomGif(command);
-                    try {
-                        await sock.sendMessage(from, { 
-                            video: { url: selectedGif }, 
-                            gifPlayback: true, 
-                            caption: `✨ Acción *${command.toUpperCase()}* hacia ${targetUser}.`, 
-                            contextInfo: { mentionedJid } 
-                        }, { quoted: m });
-                    } catch (e) {
-                        await sock.sendMessage(from, { text: `✨ Acción *${command.toUpperCase()}* hacia ${targetUser}.`, contextInfo: { mentionedJid } }, { quoted: m });
-                    }
                     break;
 
                 case 'work':
