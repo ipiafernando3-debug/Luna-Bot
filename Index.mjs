@@ -5,10 +5,10 @@ import { exec } from 'child_process';
 import readline from 'readline';
 
 const BOT_NAME = "Luna Bot";
-const BOT_VERSION = "1.1.4";
+const BOT_VERSION = "1.1.5";
 const BOT_OWNER = "Benjamin";
-// Enlace directo en formato PNG/JPEG optimizado para WhatsApp
-const BOT_AVATAR = "https://i.ibb.co/6y4G8h6/luna-avatar.jpg"; 
+// Enlace estable y directo garantizado para el avatar de Luna
+const BOT_AVATAR = "https://i.imgur.com/v8ZpM0M.jpeg"; 
 const CHANNEL_LINK = "https://whatsapp.com/channel/0029VbE6xIIJP20w9b02kz1p";
 const CHANNEL_JID = "120363381484218941@newsletter"; // Canal oficial de WhatsApp
 
@@ -162,10 +162,10 @@ async function connectToWhatsApp() {
             console.log(`\n¡${BOT_NAME} v${BOT_VERSION} está en línea y conectada permanentemente! ✅\n`);
             
             try {
-                const updateMessage = `🚀 *¡${BOT_NAME} se ha actualizado a la Versión ${BOT_VERSION}!* 💚\n\n✨ Novedades:\n• Enlace de avatar corregido a formato directo de imagen para mostrar correctamente la foto en el menú (.help).\n• Optimización de GIFs en acciones SFW y NSFW.\n\nSigue el canal oficial: ${CHANNEL_LINK}`;
+                const updateMessage = `🚀 *¡${BOT_NAME} se ha actualizado a la Versión ${BOT_VERSION}!* 💚\n\n✨ Novedades:\n• Corrección de error 404 en el enlace de la imagen de avatar para evitar cierres en el comando .help.\n\nSigue el canal oficial: ${CHANNEL_LINK}`;
                 await sock.sendMessage(CHANNEL_JID, { text: updateMessage });
             } catch (e) {
-                console.log("ℹ️ Conectado. (Aviso de actualización v1.1.4 preparado para el canal).");
+                console.log("ℹ️ Conectado. (Aviso de actualización v1.1.5 preparado para el canal).");
             }
         }
     });
