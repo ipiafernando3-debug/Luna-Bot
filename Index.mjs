@@ -7,9 +7,9 @@ import readline from 'readline';
 const BOT_NAME = "Luna Bot";
 const BOT_VERSION = "1.0.7";
 const BOT_OWNER = "Benjamin";
-const BOT_AVATAR = "https://i.imgur.com/v8ZpM0M.jpeg"; // Chica anime de cabello verde (Luna)
+const BOT_AVATAR = "https://i.imgur.com/v8ZpM0M.jpeg"; // Imagen oficial de Luna (chica de cabello verde)
 const CHANNEL_LINK = "https://whatsapp.com/channel/0029VbE6xIIJP20w9b02kz1p";
-const CHANNEL_JID = "120363381484218941@newsletter"; // Canal oficial para avisar actualizaciones (o ajusta según tu JID de canal)
+const CHANNEL_JID = "120363381484218941@newsletter"; // ID de canal de WhatsApp
 
 const nsfwStatus = {}; 
 const botStatus = {}; 
@@ -38,7 +38,6 @@ async function fetchActionGifUrl(action, isNsfw = false) {
         if (data && data.url) return data.url;
     } catch (e) {}
     
-    // Fallback seguro en caso de fallo de API
     return isNsfw 
         ? "https://media.giphy.com/media/13HXKG2HGN8aPK/giphy.mp4" 
         : "https://media.giphy.com/media/10i5d1xXpS9tG/giphy.mp4";
@@ -85,12 +84,12 @@ async function connectToWhatsApp() {
         } else if (connection === 'open') {
             console.log(`\n¡${BOT_NAME} v${BOT_VERSION} está en línea y conectada permanentemente! ✅\n`);
             
-            // Envío automático de actualización al canal oficial
+            // Envío de actualización al canal oficial de WhatsApp
             try {
-                const updateMessage = `🚀 *¡${BOT_NAME} se ha actualizado a la Versión ${BOT_VERSION}!* 💚\n\n✨ Novedades:\n• Nuevas acciones SFW y NSFW con GIFs mejorados.\n• Soporte para descarga universal de APKs.\n• Estabilidad y optimización general.\n\nSigue el canal oficial: ${CHANNEL_LINK}`;
+                const updateMessage = `🚀 *¡${BOT_NAME} se ha actualizado a la Versión ${BOT_VERSION}!* 💚\n\n✨ Novedades:\n• Ayuda y modo de uso automático en cada comando.\n• Descargas de APKs e interacciones SFW/NSFW con GIFs.\n• Estabilidad general.\n\nSigue el canal oficial: ${CHANNEL_LINK}`;
                 await sock.sendMessage(CHANNEL_JID, { text: updateMessage });
             } catch (e) {
-                console.log("ℹ️ No se pudo enviar el aviso automático al canal (verifica el JID si es necesario).");
+                console.log("ℹ️ Conectado. (Nota: Para publicar en canal, el bot debe tener permisos de administrador en la comunidad/newsletter).");
             }
         }
     });
@@ -136,22 +135,22 @@ async function connectToWhatsApp() {
                     const menuText = `🐱 *Menú Principal de ${BOT_NAME} v${BOT_VERSION}*\n` +
                                      `💚 *Mascota:* Luna (Chica de cabello verde)\n\n` +
                                      `⚙️ *General*\n` +
-                                     `  • \`.BotEdit\` | \`.bot on/off\`\n` +
+                                     `  • \`.BotEdit\` | \`.bot on / off\`\n` +
                                      `  • \`.SetBotImage\` | \`.girl\`\n\n` +
                                      `🤖 *SubBot*\n` +
                                      `  • \`.code [número]\`\n\n` +
                                      `📷 *Multimedia & APK*\n` +
-                                     `  • \`.sticker / .s\`\n` +
-                                     `  • \`.apk [enlace]\`\n\n` +
+                                     `  • \`.sticker / .s\` (Envía o responde a foto/video)\n` +
+                                     `  • \`.apk [enlace de descarga]\`\n\n` +
                                      `👤 *Perfil*\n` +
-                                     `  • \`.join\` | \`.out\` | \`.perfil\` | \`.coins\`\n\n` +
+                                     `  • \`.join\` | \`.out\` | \`.perfil [Nombre] [Edad]\` | \`.coins\`\n\n` +
                                      `✨ *Acciones SFW*\n` +
-                                     `  • \`.kiss\` | \`.hug\` | \`.pat\` | \`.slap\` | \`.dance\` | \`.cry\` | \`.poke\`\n\n` +
+                                     `  • \`.kiss\` | \`.hug\` | \`.pat\` | \`.slap\` | \`.dance\` | \`.cry\` | \`.poke\` | \`.hit\`\n\n` +
                                      `📥 *Download*\n` +
-                                     `  • \`.YT\` | \`.mp3\` | \`.tt\` | \`.FB\`\n\n` +
+                                     `  • \`.yt [link]\` | \`.mp3 [link]\` | \`.tt [link]\` | \`.fb [link]\`\n\n` +
                                      `💰 *Capital*\n` +
                                      `  • \`.work\` | \`.bet\` | \`.crime\` | \`.daily\`\n\n` +
-                                     `🔞 *NSFW & Acciones Adultas (Admin)*\n` +
+                                     `🔞 *NSFW & Acciones Adultas*\n` +
                                      `  • \`.nsfw on / off\`\n` +
                                      `  • \`.downloadX [enlace]\`\n` +
                                      `  • \`.trap\` | \`.blowjob\` | \`.cum\` | \`.nsfw_kiss\`\n\n` +
@@ -169,17 +168,13 @@ async function connectToWhatsApp() {
                     const isQuotedMedia = quotedMsg && (quotedMsg.imageMessage || quotedMsg.videoMessage);
 
                     if (!isMedia && !isQuotedMedia) {
-                        await sock.sendMessage(from, { text: '❌ Responde a una imagen/video o envíala con el texto `.sticker`' }, { quoted: m });
+                        await sock.sendMessage(from, { text: 'ℹ️ *Uso del comando .sticker:*\n\nDebes enviar una imagen/video con la leyenda `.sticker` o responder a una imagen/video existente con `.sticker` o `.s`.' }, { quoted: m });
                         break;
                     }
 
                     await sock.sendMessage(from, { text: '⏳ Creando sticker...' }, { quoted: m });
                     try {
-                        let targetMsg = m;
-                        if (isQuotedMedia) {
-                            targetMsg = { message: quotedMsg };
-                        }
-
+                        let targetMsg = isQuotedMedia ? { message: quotedMsg } : m;
                         const buffer = await downloadMediaMessage(
                             targetMsg,
                             'buffer',
@@ -201,13 +196,13 @@ async function connectToWhatsApp() {
                             if (fs.existsSync(tempIn)) fs.unlinkSync(tempIn);
                         });
                     } catch (e) {
-                        await sock.sendMessage(from, { text: '❌ Ocurrió un error al procesar el sticker.' }, { quoted: m });
+                        await sock.sendMessage(from, { text: '❌ Error al procesar el sticker.' }, { quoted: m });
                     }
                     break;
 
                 case 'apk':
-                    if (!query.startsWith('http')) {
-                        await sock.sendMessage(from, { text: '❌ Por favor ingresa un enlace de descarga de APK válido.' }, { quoted: m });
+                    if (!query || !query.startsWith('http')) {
+                        await sock.sendMessage(from, { text: 'ℹ️ *Uso del comando .apk:*\n\nEscribe el comando seguido del enlace directo de la APK.\n\n👉 Ejemplo: `.apk https://ejemplo.com/archivo.apk`' }, { quoted: m });
                         break;
                     }
                     await sock.sendMessage(from, { text: '📥 Descargando archivo APK...' }, { quoted: m });
@@ -215,7 +210,7 @@ async function connectToWhatsApp() {
                     try {
                         exec(`curl -L -o "${tempApk}" "${query}"`, async (error) => {
                             if (error || !fs.existsSync(tempApk)) {
-                                await sock.sendMessage(from, { text: '❌ No se pudo descargar el APK. Verifica el enlace.' }, { quoted: m });
+                                await sock.sendMessage(from, { text: '❌ No se pudo descargar el APK. Verifica que el enlace sea directo.' }, { quoted: m });
                                 return;
                             }
                             await sock.sendMessage(from, { 
@@ -229,6 +224,102 @@ async function connectToWhatsApp() {
                     } catch (e) {
                         if (fs.existsSync(tempApk)) fs.unlinkSync(tempApk);
                         await sock.sendMessage(from, { text: '❌ Error al procesar el APK.' }, { quoted: m });
+                    }
+                    break;
+
+                case 'yt':
+                    if (!query || !query.startsWith('http')) {
+                        await sock.sendMessage(from, { text: 'ℹ️ *Uso del comando .yt:*\n\nEscribe `.yt` seguido del enlace del video de YouTube.\n\n👉 Ejemplo: `.yt https://www.youtube.com/watch?v=...`' }, { quoted: m });
+                        break;
+                    }
+                    await sock.sendMessage(from, { text: '📥 Descargando video de YouTube...' }, { quoted: m });
+                    const tempYt = `./temp_yt_${Date.now()}.mp4`;
+                    try {
+                        await downloadMediaWithYtDlp(query, tempYt, 'mp4');
+                        await sock.sendMessage(from, { video: fs.readFileSync(tempYt), mimetype: 'video/mp4', caption: '✅ Video descargado.' }, { quoted: m });
+                        fs.unlinkSync(tempYt);
+                    } catch (e) {
+                        if (fs.existsSync(tempYt)) fs.unlinkSync(tempYt);
+                        await sock.sendMessage(from, { text: '❌ Error al descargar de YouTube.' }, { quoted: m });
+                    }
+                    break;
+
+                case 'mp3':
+                    if (!query || !query.startsWith('http')) {
+                        await sock.sendMessage(from, { text: 'ℹ️ *Uso del comando .mp3:*\n\nEscribe `.mp3` seguido del enlace para extraer el audio.\n\n👉 Ejemplo: `.mp3 https://www.youtube.com/watch?v=...`' }, { quoted: m });
+                        break;
+                    }
+                    await sock.sendMessage(from, { text: '🎵 Extrayendo audio...' }, { quoted: m });
+                    const tempMp3 = `./temp_audio_${Date.now()}.mp3`;
+                    try {
+                        await downloadMediaWithYtDlp(query, tempMp3, 'mp3');
+                        await sock.sendMessage(from, { audio: fs.readFileSync(tempMp3), mimetype: 'audio/mp4', ptt: false }, { quoted: m });
+                        fs.unlinkSync(tempMp3);
+                    } catch (e) {
+                        if (fs.existsSync(tempMp3)) fs.unlinkSync(tempMp3);
+                        await sock.sendMessage(from, { text: '❌ Error al procesar el audio.' }, { quoted: m });
+                    }
+                    break;
+
+                case 'tt':
+                    if (!query || !query.startsWith('http')) {
+                        await sock.sendMessage(from, { text: 'ℹ️ *Uso del comando .tt:*\n\nEscribe `.tt` seguido del enlace del video de TikTok.\n\n👉 Ejemplo: `.tt https://www.tiktok.com/@user/video/...`' }, { quoted: m });
+                        break;
+                    }
+                    await sock.sendMessage(from, { text: '📥 Descargando TikTok...' }, { quoted: m });
+                    const tempTt = `./temp_tt_${Date.now()}.mp4`;
+                    try {
+                        await downloadMediaWithYtDlp(query, tempTt, 'mp4');
+                        await sock.sendMessage(from, { video: fs.readFileSync(tempTt), mimetype: 'video/mp4', caption: '✅ TikTok enviado.' }, { quoted: m });
+                        fs.unlinkSync(tempTt);
+                    } catch (e) {
+                        if (fs.existsSync(tempTt)) fs.unlinkSync(tempTt);
+                        await sock.sendMessage(from, { text: '❌ Error al descargar de TikTok.' }, { quoted: m });
+                    }
+                    break;
+
+                case 'fb':
+                    if (!query || !query.startsWith('http')) {
+                        await sock.sendMessage(from, { text: 'ℹ️ *Uso del comando .fb:*\n\nEscribe `.fb` seguido del enlace del video de Facebook.\n\n👉 Ejemplo: `.fb https://www.facebook.com/...`' }, { quoted: m });
+                        break;
+                    }
+                    await sock.sendMessage(from, { text: '📥 Descargando de Facebook...' }, { quoted: m });
+                    const tempFb = `./temp_fb_${Date.now()}.mp4`;
+                    try {
+                        await downloadMediaWithYtDlp(query, tempFb, 'mp4');
+                        await sock.sendMessage(from, { video: fs.readFileSync(tempFb), mimetype: 'video/mp4', caption: '✅ Video de Facebook enviado.' }, { quoted: m });
+                        fs.unlinkSync(tempFb);
+                    } catch (e) {
+                        if (fs.existsSync(tempFb)) fs.unlinkSync(tempFb);
+                        await sock.sendMessage(from, { text: '❌ Error al descargar de Facebook.' }, { quoted: m });
+                    }
+                    break;
+
+                case 'code':
+                    if (!query) {
+                        await sock.sendMessage(from, { text: 'ℹ️ *Uso del comando .code:*\n\nIngresa el número con su código de país sin espacios ni el signo +.\n\n👉 Ejemplo: `.code 573001234567`' }, { quoted: m });
+                        break;
+                    }
+                    const targetPhone = query.replace(/[^0-9]/g, '');
+                    await sock.sendMessage(from, { text: `⏳ Generando código para *${targetPhone}*...` }, { quoted: m });
+                    try {
+                        const pairingCode = await sock.requestPairingCode(targetPhone);
+                        await sock.sendMessage(from, { text: `🔑 *Código:* \`${pairingCode}\`` }, { quoted: m });
+                    } catch (e) {
+                        await sock.sendMessage(from, { text: '❌ Error al generar el código.' }, { quoted: m });
+                    }
+                    break;
+
+                case 'bot':
+                    const estadoArg = args[0]?.toLowerCase();
+                    if (estadoArg === 'off') {
+                        botStatus[from] = false;
+                        await sock.sendMessage(from, { text: `🔴 El bot ha sido *apagado* en este chat.` }, { quoted: m });
+                    } else if (estadoArg === 'on') {
+                        botStatus[from] = true;
+                        await sock.sendMessage(from, { text: `🟢 ¡El bot está *encendido*!` }, { quoted: m });
+                    } else {
+                        await sock.sendMessage(from, { text: 'ℹ️ *Uso del comando .bot:*\n\nEscribe `.bot on` para encenderlo o `.bot off` para apagarlo en el chat.' }, { quoted: m });
                     }
                     break;
 
@@ -246,7 +337,7 @@ async function connectToWhatsApp() {
                         await sock.sendMessage(from, { 
                             video: { url: gifUrl }, 
                             gifPlayback: true, 
-                            caption: `✨ Luna te muestra la acción *${command.toUpperCase()}* hacia${targetUser}.`, 
+                            caption: `✨ Acción *${command.toUpperCase()}* hacia${targetUser}.`, 
                             contextInfo: { mentionedJid: mentionedJid[0] ? [mentionedJid[0]] : [] } 
                         }, { quoted: m });
                     } catch (e) {
@@ -259,7 +350,7 @@ async function connectToWhatsApp() {
                 case 'cum':
                 case 'nsfw_kiss':
                     if (!nsfwStatus[from]) {
-                        await sock.sendMessage(from, { text: '🔒 *Acceso Denegado:* El modo NSFW está desactivado en este chat. Un administrador debe activarlo con `.nsfw on`.' }, { quoted: m });
+                        await sock.sendMessage(from, { text: '🔒 *Acceso Denegado:* El modo NSFW está desactivado. Usa `.nsfw on` para activarlo.' }, { quoted: m });
                         break;
                     }
                     const nsfwAction = command === 'nsfw_kiss' ? 'kiss' : command;
@@ -277,29 +368,34 @@ async function connectToWhatsApp() {
                     }
                     break;
 
-                case 'code':
-                    if (!query) {
-                        await sock.sendMessage(from, { text: '❌ Por favor ingresa un número. Ejemplo: `.code 573001234567`' }, { quoted: m });
-                        break;
-                    }
-                    const targetPhone = query.replace(/[^0-9]/g, '');
-                    await sock.sendMessage(from, { text: `⏳ Generando código para *${targetPhone}*...` }, { quoted: m });
-                    try {
-                        const pairingCode = await sock.requestPairingCode(targetPhone);
-                        await sock.sendMessage(from, { text: `🔑 *Código:* \`${pairingCode}\`` }, { quoted: m });
-                    } catch (e) {
-                        await sock.sendMessage(from, { text: '❌ Error al generar el código.' }, { quoted: m });
+                case 'nsfw':
+                    const subCommand = args[0]?.toLowerCase();
+                    if (subCommand === 'on' || subCommand === 'off') {
+                        nsfwStatus[from] = (subCommand === 'on');
+                        await sock.sendMessage(from, { text: `🔞 Modo NSFW *${subCommand === 'on' ? 'ACTIVADO' : 'DESACTIVADO'}*` }, { quoted: m });
+                    } else {
+                        await sock.sendMessage(from, { text: 'ℹ️ *Uso del comando .nsfw:*\n\nEscribe `.nsfw on` para activarlo o `.nsfw off` para desactivarlo.' }, { quoted: m });
                     }
                     break;
 
-                case 'bot':
-                    const estadoArg = args[0]?.toLowerCase();
-                    if (estadoArg === 'off') {
-                        botStatus[from] = false;
-                        await sock.sendMessage(from, { text: `🔴 El bot ha sido *apagado* aquí.` }, { quoted: m });
-                    } else if (estadoArg === 'on') {
-                        botStatus[from] = true;
-                        await sock.sendMessage(from, { text: `🟢 ¡El bot está *encendido*!` }, { quoted: m });
+                case 'downloadx':
+                    if (!nsfwStatus[from]) {
+                        await sock.sendMessage(from, { text: '🔒 *Acceso Denegado:* Modo NSFW desactivado.' }, { quoted: m });
+                        break;
+                    }
+                    if (!query || !query.startsWith('http')) {
+                        await sock.sendMessage(from, { text: 'ℹ️ *Uso del comando .downloadX:*\n\nEscribe `.downloadX` seguido del enlace adulto a descargar.\n\n👉 Ejemplo: `.downloadX https://sitio.com/video`' }, { quoted: m });
+                        break;
+                    }
+                    await sock.sendMessage(from, { text: '📥 Descargando contenido...' }, { quoted: m });
+                    const tempDx = `./temp_dx_${Date.now()}.mp4`;
+                    try {
+                        await downloadMediaWithYtDlp(query, tempDx, 'mp4');
+                        await sock.sendMessage(from, { video: fs.readFileSync(tempDx), mimetype: 'video/mp4', caption: '🔞 Video descargado.' }, { quoted: m });
+                        fs.unlinkSync(tempDx);
+                    } catch (e) {
+                        if (fs.existsSync(tempDx)) fs.unlinkSync(tempDx);
+                        await sock.sendMessage(from, { text: '❌ Error al procesar el enlace.' }, { quoted: m });
                     }
                     break;
 
@@ -312,73 +408,22 @@ async function connectToWhatsApp() {
 
                 case 'join':
                     if (userProfiles[senderId]) {
-                        await sock.sendMessage(from, { text: `⚠️ Ya tienes perfil. Usa \`.perfil\`` }, { quoted: m });
+                        await sock.sendMessage(from, { text: `⚠️ Ya tienes perfil creado. Usa \`.perfil\`` }, { quoted: m });
                     } else {
                         userProfiles[senderId] = { name: 'Usuario', age: 18, coins: 100 };
                         await sock.sendMessage(from, { text: `🎉 ¡Perfil creado! +100 🪙 de bono.` }, { quoted: m });
                     }
                     break;
 
-                case 'out':
-                    delete userProfiles[senderId];
-                    await sock.sendMessage(from, { text: `🗑️ Perfil eliminado.` }, { quoted: m });
-                    break;
-
                 case 'perfil':
                     if (!userProfiles[senderId]) userProfiles[senderId] = { name: 'Usuario', age: 18, coins: 100 };
-                    const p = userProfiles[senderId];
-                    await sock.sendMessage(from, { text: `👤 *Perfil*\n• Nombre: ${p.name}\n• Monedas: ${p.coins} 🪙` }, { quoted: m });
-                    break;
-
-                case 'coins':
-                    if (!userProfiles[senderId]) userProfiles[senderId] = { name: 'Usuario', age: 18, coins: 100 };
-                    await sock.sendMessage(from, { text: `🪙 Tienes *${userProfiles[senderId].coins} monedas*.` }, { quoted: m });
-                    break;
-
-                case 'work':
-                    if (!userProfiles[senderId]) userProfiles[senderId] = { name: 'Usuario', age: 18, coins: 100 };
-                    const gWork = Math.floor(Math.random() * 80) + 20;
-                    userProfiles[senderId].coins += gWork;
-                    await sock.sendMessage(from, { text: `💼 Trabajaste y ganaste +${gWork} 🪙.` }, { quoted: m });
-                    break;
-
-                case 'bet':
-                    if (!userProfiles[senderId]) userProfiles[senderId] = { name: 'Usuario', age: 18, coins: 100 };
-                    if (userProfiles[senderId].coins < 10) {
-                        await sock.sendMessage(from, { text: `❌ Necesitas 10 coins.` }, { quoted: m });
-                        break;
-                    }
-                    userProfiles[senderId].coins -= 10;
-                    if (Math.random() < 0.5) {
-                        userProfiles[senderId].coins += 40;
-                        await sock.sendMessage(from, { text: `🎲 ¡Ganaste! +40 🪙.` }, { quoted: m });
+                    if (args.length >= 2) {
+                        userProfiles[senderId].name = args[0];
+                        userProfiles[senderId].age = parseInt(args[1]) || 18;
+                        await sock.sendMessage(from, { text: `✅ Perfil actualizado:\n👤 Nombre: *${userProfiles[senderId].name}*\n🎂 Edad: *${userProfiles[senderId].age}*` }, { quoted: m });
                     } else {
-                        await sock.sendMessage(from, { text: `🎲 ¡Perdiste la apuesta!` }, { quoted: m });
-                    }
-                    break;
-
-                case 'yt':
-                    if (!query.startsWith('http')) {
-                        await sock.sendMessage(from, { text: '❌ Ingresa enlace de YouTube.' }, { quoted: m });
-                        break;
-                    }
-                    await sock.sendMessage(from, { text: '📥 Descargando video...' }, { quoted: m });
-                    const tempYt = `./temp_yt_${Date.now()}.mp4`;
-                    try {
-                        await downloadMediaWithYtDlp(query, tempYt, 'mp4');
-                        await sock.sendMessage(from, { video: fs.readFileSync(tempYt), mimetype: 'video/mp4' }, { quoted: m });
-                        fs.unlinkSync(tempYt);
-                    } catch (e) {
-                        if (fs.existsSync(tempYt)) fs.unlinkSync(tempYt);
-                        await sock.sendMessage(from, { text: '❌ Error al descargar.' }, { quoted: m });
-                    }
-                    break;
-
-                case 'nsfw':
-                    const subCommand = args[0]?.toLowerCase();
-                    if (subCommand === 'on' || subCommand === 'off') {
-                        nsfwStatus[from] = (subCommand === 'on');
-                        await sock.sendMessage(from, { text: `🔞 NSFW *${subCommand === 'on' ? 'ACTIVADO' : 'DESACTIVADO'}*` }, { quoted: m });
+                        const p = userProfiles[senderId];
+                        await sock.sendMessage(from, { text: `👤 *Perfil*\n• Nombre: ${p.name}\n• Edad: ${p.age}\n• Monedas: ${p.coins} 🪙\n\n_Para editar usa:_ \`.perfil [Nombre] [Edad]\`` }, { quoted: m });
                     }
                     break;
 
@@ -393,4 +438,4 @@ async function connectToWhatsApp() {
     });
 }
 
-connectToWhatsApp();
+connectToWhatsApp(); 
