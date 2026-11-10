@@ -7,9 +7,8 @@ import axios from 'axios';
 import AdmZip from 'adm-zip';
 
 const BOT_NAME = "Luna Bot";
-const BOT_VERSION = "1.1.9";
+const BOT_VERSION = "1.1.7";
 const BOT_OWNER = "Benjamin";
-// BOT_AVATAR corregido con enlace RAW de GitHub para que WhatsApp lo cargue bien
 const BOT_AVATAR = "https://raw.githubusercontent.com/ipiafernando3-debug/Luna-Bot/main/LunaBot.jpg"; 
 const CHANNEL_LINK = "https://whatsapp.com/channel/0029VbE6xIIJP20w9b02kz1p";
 const CHANNEL_JID = "120363381484218941@newsletter";
@@ -185,7 +184,7 @@ async function connectToWhatsApp() {
             console.log(`\n¡${BOT_NAME} v${BOT_VERSION} está en línea y conectada permanentemente! ✅\n`);
             
             try {
-                const updateMessage = `🚀 *¡${BOT_NAME} se ha actualizado a la Versión ${BOT_VERSION}!* 💚\n\n✨ Novedades:\n• Avatar de Luna corregido.\n• Descargas optimizadas.\n\nSigue el canal oficial: ${CHANNEL_LINK}`;
+                const updateMessage = `🚀 *¡${BOT_NAME} se ha actualizado a la Versión ${BOT_VERSION}!* 💚\n\n✨ Novedades:\n• Errores corregidos.\n• Sistema de descarga y paquetes optimizado.\n\nSigue el canal oficial: ${CHANNEL_LINK}`;
                 await sock.sendMessage(CHANNEL_JID, { text: updateMessage });
             } catch (e) {
                 console.log("ℹ️ Conectado.");
@@ -256,7 +255,19 @@ async function connectToWhatsApp() {
                                      `📢 *Canal Oficial*\n` +
                                      `  • ${CHANNEL_LINK}`;
 
-                    await sock.sendMessage(from, { image: { url: BOT_AVATAR }, caption: menuText }, { quoted: m });
+                    try {
+                        const tempAvatar = `./temp_avatar_${Date.now()}.jpg`;
+                        await new Promise((resolve, reject) => {
+                            exec(`curl -L -s -o "${tempAvatar}" "${BOT_AVATAR}"`, (err) => {
+                                if (err || !fs.existsSync(tempAvatar)) reject(err);
+                                else resolve();
+                            });
+                        });
+                        await sock.sendMessage(from, { image: fs.readFileSync(tempAvatar), caption: menuText }, { quoted: m });
+                        if (fs.existsSync(tempAvatar)) fs.unlinkSync(tempAvatar);
+                    } catch (e) {
+                        await sock.sendMessage(from, { text: menuText }, { quoted: m });
+                    }
                     break;
 
                 case 'sticker':
@@ -450,7 +461,7 @@ async function connectToWhatsApp() {
                             break;
                         }
 
-                        await sock.sendMessage(from, { text: `📦 Buscando 5 imágenes de *${query}* en rule34.xxx y creando el ZIP...` }, { quoted: m });
+                        await sock.sendMessage(from, { text: `📦 Buscando imágenes de *${query}* en rule34.xxx...` }, { quoted: m });
 
                         try {
                             const apiUrl = `https://api.rule34.xxx/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(query)}&json=1`;
@@ -462,28 +473,24 @@ async function connectToWhatsApp() {
                             }
 
                             const shuffled = data.sort(() => 0.5 - Math.random());
-                            const selectedPosts = shuffled.slice(0, 5);
-
                             const zip = new AdmZip();
                             let downloadedCount = 0;
 
-                            for (let i = 0; i < selectedPosts.length; i++) {
-                                const post = selectedPosts[i];
+                            for (let i = 0; i < shuffled.length && downloadedCount < 5; i++) {
+                                const post = shuffled[i];
                                 const imgUrl = post.file_url || post.sample_url;
                                 if (!imgUrl) continue;
 
                                 try {
-                                    const imgRes = await axios.get(imgUrl, { responseType: 'arraybuffer' });
+                                    const imgRes = await axios.get(imgUrl, { responseType: 'arraybuffer', timeout: 5000 });
                                     const ext = imgUrl.split('.').pop().split('?')[0] || 'jpg';
-                                    zip.addFile(`image_${i + 1}.${ext}`, Buffer.from(imgRes.data));
+                                    zip.addFile(`image_${downloadedCount + 1}.${ext}`, Buffer.from(imgRes.data));
                                     downloadedCount++;
-                                } catch (err) {
-                                    console.error(`Error descargando imagen ${i + 1}:`, err.message);
-                                }
+                                } catch (err) {}
                             }
 
                             if (downloadedCount === 0) {
-                                await sock.sendMessage(from, { text: '❌ No se pudieron descargar las imágenes seleccionadas.' }, { quoted: m });
+                                await sock.sendMessage(from, { text: '❌ No se pudieron descargar imágenes de ese término. Prueba con otro (ej: .pack anime).' }, { quoted: m });
                                 break;
                             }
 
@@ -494,12 +501,11 @@ async function connectToWhatsApp() {
                                 document: zipBuffer, 
                                 mimetype: 'application/zip', 
                                 fileName: zipName, 
-                                caption: `🔞 Pack de *${query}* (${downloadedCount} imágenes) descargado desde rule34.xxx` 
+                                caption: `🔞 Pack de *${query}* (${downloadedCount} imágenes) descargado con éxito.` 
                             }, { quoted: m });
 
                         } catch (e) {
-                            console.error(e);
-                            await sock.sendMessage(from, { text: '❌ Ocurrió an error al procesar el comando .pack con rule34.' }, { quoted: m });
+                            await sock.sendMessage(from, { text: '❌ Ocurrió un error al procesar el comando .pack.' }, { quoted: m });
                         }
                         break;
                     }
@@ -550,15 +556,27 @@ async function connectToWhatsApp() {
                     } catch (e) {
                         console.log("Error downloadX:", e.message);
                         if (fs.existsSync(tempDx)) fs.unlinkSync(tempDx);
-                        await sock.sendMessage(from, { text: '❌ Error al procesar el enlace. Intenta con otro link.' }, { quoted: m });
+                        await sock.sendMessage(from, { text: '❌ Error al procesar el enlace. El sitio web puede requerir autenticación o estar protegido.' }, { quoted: m });
                     }
                     break;
 
                 case 'girl':
-                    await sock.sendMessage(from, { 
-                        image: { url: BOT_AVATAR }, 
-                        caption: `💚 *Luna* - Tu chica de cabello verde favorita y mascota oficial de ${BOT_NAME} v${BOT_VERSION}.` 
-                    }, { quoted: m });
+                    try {
+                        const tempAvatar = `./temp_girl_${Date.now()}.jpg`;
+                        await new Promise((resolve, reject) => {
+                            exec(`curl -L -s -o "${tempAvatar}" "${BOT_AVATAR}"`, (err) => {
+                                if (err || !fs.existsSync(tempAvatar)) reject(err);
+                                else resolve();
+                            });
+                        });
+                        await sock.sendMessage(from, { 
+                            image: fs.readFileSync(tempAvatar), 
+                            caption: `💚 *Luna* - Tu chica de cabello verde favorita y mascota oficial de ${BOT_NAME} v${BOT_VERSION}.` 
+                        }, { quoted: m });
+                        if (fs.existsSync(tempAvatar)) fs.unlinkSync(tempAvatar);
+                    } catch (e) {
+                        await sock.sendMessage(from, { text: `💚 *Luna* - Tu chica de cabello verde favorita y mascota oficial de ${BOT_NAME} v${BOT_VERSION}.` }, { quoted: m });
+                    }
                     break;
 
                 case 'join':
