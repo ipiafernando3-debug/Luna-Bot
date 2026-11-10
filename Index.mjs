@@ -4,8 +4,6 @@ import pino from 'pino';
 import fs from 'fs';
 import { exec } from 'child_process';
 import readline from 'readline';
-import archiverPkg from 'archiver';
-const archiver = archiverPkg.default || archiverPkg;
 
 const BOT_NAME = "Luna Bot";
 const BOT_VERSION = "1.1.7";
@@ -434,6 +432,9 @@ async function connectToWhatsApp() {
                         if (!fs.existsSync(packDir)) fs.mkdirSync(packDir);
 
                         try {
+                            const archiverModule = await import('archiver');
+                            const archiver = archiverModule.default || archiverModule;
+                            
                             const count = Math.floor(Math.random() * 6) + 5; 
                             const categories = ['waifu', 'neko', 'trap', 'blowjob'];
                             let downloadedCount = 0;
@@ -573,4 +574,3 @@ async function connectToWhatsApp() {
 }
 
 connectToWhatsApp();
- 
