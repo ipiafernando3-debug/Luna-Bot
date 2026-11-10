@@ -9,7 +9,8 @@ import AdmZip from 'adm-zip';
 const BOT_NAME = "Luna Bot";
 const BOT_VERSION = "1.1.7";
 const BOT_OWNER = "Benjamin";
-const BOT_AVATAR = "https://github.com/ipiafernando3-debug/Luna-Bot/blob/main/LunaBot.jpg"; 
+// BOT_AVATAR corregido con enlace RAW de GitHub para que WhatsApp lo cargue bien
+const BOT_AVATAR = "https://raw.githubusercontent.com/ipiafernando3-debug/Luna-Bot/main/LunaBot.jpg"; 
 const CHANNEL_LINK = "https://whatsapp.com/channel/0029VbE6xIIJP20w9b02kz1p";
 const CHANNEL_JID = "120363381484218941@newsletter";
 
@@ -20,33 +21,34 @@ const userProfiles = {};
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 const question = (text) => new Promise((resolve) => rl.question(text, resolve));
 
-// ============ FUNCIÓN DOWNLOAD MEDIA MEJORADA ============
 function downloadMediaWithYtDlp(url, outputPath, format = 'mp4') {
     return new Promise(async (resolve, reject) => {
-        const command = `yt-dlp --get-url --no-check-certificate --geo-bypass --no-playlist --add-header "User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64)" "${url}"`;
+        let flag = format === 'mp3'
+            ? '-x --audio-format mp3 --audio-quality 0'
+            : '-f "bv+ba/b/best" --merge-output-format mp4 --remux-video mp4';
         
-        exec(command, { maxBuffer: 1024 * 1024 * 10 }, (err, stdout) => {
-            let directUrl = stdout ? stdout.trim().split('\n')[0] : '';
-            const targetUrl = directUrl && directUrl.startsWith('http') ? directUrl : url;
+        const command = `yt-dlp --no-check-certificate --geo-bypass --no-playlist --add-header "User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64)" --add-header "Referer:${url}" ${flag} -o "${outputPath}" "${url}"`;
+        
+        exec(command, { maxBuffer: 1024 * 1024 * 500 }, (error) => {
+            if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 1000) {
+                return resolve(outputPath);
+            }
             
-            let flag = format === 'mp3'
-                ? '-x --audio-format mp3 --audio-quality 0'
-                : '-f "bv+ba/b/best" --merge-output-format mp4 --remux-video mp4';
-            
-            const dlCommand = `yt-dlp --no-check-certificate --geo-bypass --no-playlist --add-header "User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64)" --add-header "Referer:${url}" ${flag} -o "${outputPath}" "${targetUrl}"`;
-            
-            exec(dlCommand, { maxBuffer: 1024 * 1024 * 500 }, (error) => {
-                if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 1000) {
-                    return resolve(outputPath);
-                }
-                
-                exec(`curl -L -s -A "Mozilla/5.0" --max-time 120 -o "${outputPath}" "${targetUrl}"`, (curlErr) => {
-                    if (!curlErr && fs.existsSync(outputPath) && fs.statSync(outputPath).size > 1000) {
-                        return resolve(outputPath);
-                    }
+            const fallbackCommand = `yt-dlp --get-url --no-check-certificate --geo-bypass --no-playlist --add-header "User-Agent:Mozilla/5.0" "${url}"`;
+            exec(fallbackCommand, (err, stdout) => {
+                const directUrl = stdout ? stdout.trim().split('\n')[0] : '';
+                if (directUrl && directUrl.startsWith('http')) {
+                    exec(`curl -L -s -A "Mozilla/5.0" --max-time 120 -o "${outputPath}" "${directUrl}"`, (curlErr) => {
+                        if (!curlErr && fs.existsSync(outputPath) && fs.statSync(outputPath).size > 1000) {
+                            return resolve(outputPath);
+                        }
+                        if (error) reject(error);
+                        else reject(new Error("El archivo no se pudo descargar."));
+                    });
+                } else {
                     if (error) reject(error);
-                    else reject(new Error("El archivo no se pudo descargar."));
-                });
+                    else reject(new Error("El archivo no se generó."));
+                }
             });
         });
     });
@@ -183,7 +185,7 @@ async function connectToWhatsApp() {
             console.log(`\n¡${BOT_NAME} v${BOT_VERSION} está en línea y conectada permanentemente! ✅\n`);
             
             try {
-                const updateMessage = `🚀 *¡${BOT_NAME} se ha actualizado a la Versión ${BOT_VERSION}!* 💚\n\n✨ Novedades:\n• Restauración completa de todos los comandos.\n• Corrección definitiva de descargas y pack de Rule34.\n\nSigue el canal oficial: ${CHANNEL_LINK}`;
+                const updateMessage = `🚀 *¡${BOT_NAME} se ha actualizado a la Versión ${BOT_VERSION}!* 💚\n\n✨ Novedades:\n• Avatar de Luna corregido.\n• Descargas optimizadas.\n\nSigue el canal oficial: ${CHANNEL_LINK}`;
                 await sock.sendMessage(CHANNEL_JID, { text: updateMessage });
             } catch (e) {
                 console.log("ℹ️ Conectado.");
@@ -497,7 +499,7 @@ async function connectToWhatsApp() {
 
                         } catch (e) {
                             console.error(e);
-                            await sock.sendMessage(from, { text: '❌ Ocurrió un error al procesar el comando .pack con rule34.' }, { quoted: m });
+                            await sock.sendMessage(from, { text: '❌ Ocurrió an error al procesar el comando .pack con rule34.' }, { quoted: m });
                         }
                         break;
                     }
@@ -523,7 +525,7 @@ async function connectToWhatsApp() {
                         break;
                     }
                     if (!query || !query.startsWith('http')) {
-                        await sock.sendMessage(from, { text: 'ℹ️ *Uso del comando .downloadX:* Ingresa un enlace válido.' }, { quoted: m });
+                        await sock.sendMessage(from, { text: 'ℹ️ *Uso del comando .downloadX:* Ingresa un enlace web válido.' }, { quoted: m });
                         break;
                     }
                     await sock.sendMessage(from, { text: '📥 Descargando contenido...' }, { quoted: m });
