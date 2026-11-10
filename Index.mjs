@@ -3,10 +3,11 @@ import pino from 'pino';
 import fs from 'fs';
 import { exec } from 'child_process';
 import readline from 'readline';
-import archiver from 'archiver'; // <-- Importación para generar el archivo ZIP
+import archiverPkg from 'archiver';
+const archiver = archiverPkg.default || archiverPkg;
 
 const BOT_NAME = "Luna Bot";
-const BOT_VERSION = "1.1.7";
+const BOT_VERSION = "1.1.8";
 const BOT_OWNER = "Benjamin";
 // Enlace directo y estable de la imagen de Luna (chica de cabello verde)
 const BOT_AVATAR = "https://i.imgur.com/v8ZpM0M.jpeg"; 
