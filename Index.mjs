@@ -7,7 +7,7 @@ import readline from 'readline';
 const BOT_NAME = "Luna Bot";
 const BOT_VERSION = "1.1.7";
 const BOT_OWNER = "Benjamin";
-const BOT_AVATAR = "https://i.imgur.com/v8ZpM0M.jpeg"; 
+const BOT_AVATAR = "https://github.com/ipiafernando3-debug/Luna-Bot/blob/main/LunaBot.jpg"; 
 const CHANNEL_LINK = "https://whatsapp.com/channel/0029VbE6xIIJP20w9b02kz1p";
 const CHANNEL_JID = "120363381484218941@newsletter";
 
