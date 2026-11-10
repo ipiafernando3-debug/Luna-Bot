@@ -26,7 +26,8 @@ function downloadMediaWithYtDlp(url, outputPath, format = 'mp4') {
             ? '-x --audio-format mp3 --audio-quality 0'
             : '-f "bv+ba/b/best" --merge-output-format mp4 --remux-video mp4';
         
-        const command = `yt-dlp --no-check-certificate --geo-bypass --no-playlist --add-header "User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64)" --add-header "Referer:${url}" ${flag} -o "${outputPath}" "${url}"`;
+        // Cabeceras y suplantación optimizadas para evitar bloqueos 403 en sitios protegidos
+        const command = `yt-dlp --no-check-certificate --geo-bypass --no-playlist --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" --referer "https://www.pornhub.com" ${flag} -o "${outputPath}" "${url}"`;
         
         exec(command, { maxBuffer: 1024 * 1024 * 500 }, (error) => {
             if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 1000) {
