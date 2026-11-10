@@ -3,6 +3,8 @@ import pino from 'pino';
 import fs from 'fs';
 import { exec } from 'child_process';
 import readline from 'readline';
+import axios from 'axios';
+import AdmZip from 'adm-zip';
 
 const BOT_NAME = "Luna Bot";
 const BOT_VERSION = "1.1.7";
@@ -18,17 +20,14 @@ const userProfiles = {};
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 const question = (text) => new Promise((resolve) => rl.question(text, resolve));
 
-// ============ FUNCIÓN CORREGIDA - ESTA ERA LA QUE GEMINI DAÑÓ ============
 function downloadMediaWithYtDlp(url, outputPath, format = 'mp4') {
     return new Promise(async (resolve, reject) => {
-        // 1. Si es link directo de video, bajarlo directo sin yt-dlp
         const isDirect = /\.(mp4|webm|mov|mkv|m3u8|mp3)(\?|$)/i.test(url);
         if (isDirect) {
             exec(`curl -L -s -A "Mozilla/5.0" --max-time 120 -o "${outputPath}" "${url}"`, (err) => {
                 if (!err && fs.existsSync(outputPath) && fs.statSync(outputPath).size > 1000) {
                     return resolve(outputPath);
                 }
-                // Si curl falla, sigue a yt-dlp
                 tryYtDlp();
             });
             return;
@@ -187,7 +186,7 @@ async function connectToWhatsApp() {
                 const updateMessage = `🚀 *¡${BOT_NAME} se ha actualizado a la Versión ${BOT_VERSION}!* 💚\n\n✨ Novedades:\n• Restauración completa de todos los comandos (Stickers, Capital, Perfil, YouTube/TikTok, etc.).\n• Corrección definitiva del avatar de Luna.\n\nSigue el canal oficial: ${CHANNEL_LINK}`;
                 await sock.sendMessage(CHANNEL_JID, { text: updateMessage });
             } catch (e) {
-                console.log("ℹ️ Conectado. (Aviso de actualización v1.1.7 preparado para el canal).");
+                console.log("ℹ️ Conectado. (Aviso de actualización preparado para el canal).");
             }
         }
     });
@@ -200,7 +199,6 @@ async function connectToWhatsApp() {
 
         const from = m.key.remoteJid;
         const senderId = m.key.participant || from;
-        const isGroup = from.endsWith('@g.us');
 
         const messageType = Object.keys(m.message)[0];
         const body = messageType === 'conversation' 
@@ -251,7 +249,7 @@ async function connectToWhatsApp() {
                                      `🔞 *NSFW & Acciones Adultas*\n` +
                                      `  • \`.nsfw on / off\`\n` +
                                      `  • \`.downloadX [enlace]\`\n` +
-                                     `  • \`.pack\` (Pack de 5 a 10 imágenes)\n` +
+                                     `  • \`.pack [término]\` (Ej: .pack megumin)\n` +
                                      `  • \`.trap\` | \`.blowjob\` | \`.cum\` | \`.nsfw_kiss\`\n\n` +
                                      `📢 *Canal Oficial*\n` +
                                      `  • ${CHANNEL_LINK}`;
@@ -301,7 +299,7 @@ async function connectToWhatsApp() {
 
                 case 'apk':
                     if (!query || !query.startsWith('http')) {
-                        await sock.sendMessage(from, { text: 'ℹ️ *Uso del comando .apk:*\n\nEscribe el comando seguido del enlace directo de la APK.\n\n👉 Ejemplo: `.apk https://ejemplo.com/archivo.apk`' }, { quoted: m });
+                        await sock.sendMessage(from, { text: 'ℹ️ *Uso del comando .apk:*\n\nEscribe el comando seguido del enlace directo de la APK.' }, { quoted: m });
                         break;
                     }
                     await sock.sendMessage(from, { text: '📥 Descargando archivo APK...' }, { quoted: m });
@@ -309,7 +307,7 @@ async function connectToWhatsApp() {
                     try {
                         exec(`curl -L -o "${tempApk}" "${query}"`, async (error) => {
                             if (error || !fs.existsSync(tempApk)) {
-                                await sock.sendMessage(from, { text: '❌ No se pudo descargar el APK. Verifica que el enlace sea directo.' }, { quoted: m });
+                                await sock.sendMessage(from, { text: '❌ No se pudo descargar el APK.' }, { quoted: m });
                                 return;
                             }
                             await sock.sendMessage(from, { 
@@ -328,7 +326,7 @@ async function connectToWhatsApp() {
 
                 case 'yt':
                     if (!query || !query.startsWith('http')) {
-                        await sock.sendMessage(from, { text: 'ℹ️ *Uso del comando .yt:*\n\nEscribe `.yt` seguido del enlace del video de YouTube.\n\n👉 Ejemplo: `.yt https://www.youtube.com/watch?v=...`' }, { quoted: m });
+                        await sock.sendMessage(from, { text: 'ℹ️ *Uso del comando .yt:*\n\nEscribe `.yt` seguido del enlace de YouTube.' }, { quoted: m });
                         break;
                     }
                     await sock.sendMessage(from, { text: '📥 Descargando video de YouTube...' }, { quoted: m });
@@ -345,7 +343,7 @@ async function connectToWhatsApp() {
 
                 case 'mp3':
                     if (!query || !query.startsWith('http')) {
-                        await sock.sendMessage(from, { text: 'ℹ️ *Uso del comando .mp3:*\n\nEscribe `.mp3` seguido del enlace para extraer el audio.\n\n👉 Ejemplo: `.mp3 https://www.youtube.com/watch?v=...`' }, { quoted: m });
+                        await sock.sendMessage(from, { text: 'ℹ️ *Uso del comando .mp3:*\n\nEscribe `.mp3` seguido del enlace.' }, { quoted: m });
                         break;
                     }
                     await sock.sendMessage(from, { text: '🎵 Extrayendo audio...' }, { quoted: m });
@@ -362,7 +360,7 @@ async function connectToWhatsApp() {
 
                 case 'tt':
                     if (!query || !query.startsWith('http')) {
-                        await sock.sendMessage(from, { text: 'ℹ️ *Uso del comando .tt:*\n\nEscribe `.tt` seguido del enlace del video de TikTok.\n\n👉 Ejemplo: `.tt https://www.tiktok.com/@user/video/...`' }, { quoted: m });
+                        await sock.sendMessage(from, { text: 'ℹ️ *Uso del comando .tt:*\n\nEscribe `.tt` seguido del enlace de TikTok.' }, { quoted: m });
                         break;
                     }
                     await sock.sendMessage(from, { text: '📥 Descargando TikTok...' }, { quoted: m });
@@ -377,9 +375,9 @@ async function connectToWhatsApp() {
                     }
                     break;
 
-                                case 'fb':
+                case 'fb':
                     if (!query || !query.startsWith('http')) {
-                        await sock.sendMessage(from, { text: 'ℹ️ *Uso del comando .fb:*\n\nEscribe `.fb` seguido del enlace del video de Facebook.\n\n👉 Ejemplo: `.fb https://www.facebook.com/...`' }, { quoted: m });
+                        await sock.sendMessage(from, { text: 'ℹ️ *Uso del comando .fb:*\n\nEscribe `.fb` seguido del enlace de Facebook.' }, { quoted: m });
                         break;
                     }
                     await sock.sendMessage(from, { text: '📥 Descargando de Facebook...' }, { quoted: m });
