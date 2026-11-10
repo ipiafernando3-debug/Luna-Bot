@@ -1,3 +1,4 @@
+cat << 'EOF' > index.mjs
 import { makeWASocket, useMultiFileAuthState, DisconnectReason, Browsers, downloadMediaMessage } from '@whiskeysockets/baileys';
 import pino from 'pino';
 import fs from 'fs';
@@ -7,12 +8,11 @@ import archiverPkg from 'archiver';
 const archiver = archiverPkg.default || archiverPkg;
 
 const BOT_NAME = "Luna Bot";
-const BOT_VERSION = "1.1.8";
+const BOT_VERSION = "1.1.7";
 const BOT_OWNER = "Benjamin";
-// Enlace directo y estable de la imagen de Luna (chica de cabello verde)
 const BOT_AVATAR = "https://i.imgur.com/v8ZpM0M.jpeg"; 
 const CHANNEL_LINK = "https://whatsapp.com/channel/0029VbE6xIIJP20w9b02kz1p";
-const CHANNEL_JID = "120363381484218941@newsletter"; // Canal oficial de WhatsApp
+const CHANNEL_JID = "120363381484218941@newsletter";
 
 const nsfwStatus = {}; 
 const botStatus = {}; 
@@ -434,7 +434,7 @@ async function connectToWhatsApp() {
                         if (!fs.existsSync(packDir)) fs.mkdirSync(packDir);
 
                         try {
-                            const count = Math.floor(Math.random() * 6) + 5; // Entre 5 y 10 imágenes
+                            const count = Math.floor(Math.random() * 6) + 5; 
                             const categories = ['waifu', 'neko', 'trap', 'blowjob'];
                             let downloadedCount = 0;
 
@@ -573,3 +573,4 @@ async function connectToWhatsApp() {
 }
 
 connectToWhatsApp();
+ 
