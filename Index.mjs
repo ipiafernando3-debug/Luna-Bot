@@ -1,4 +1,3 @@
-cat << 'EOF' > index.mjs
 import { makeWASocket, useMultiFileAuthState, DisconnectReason, Browsers, downloadMediaMessage } from '@whiskeysockets/baileys';
 import pino from 'pino';
 import fs from 'fs';
@@ -19,15 +18,38 @@ const userProfiles = {};
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 const question = (text) => new Promise((resolve) => rl.question(text, resolve));
 
+// ============ FUNCIÓN CORREGIDA - ESTA ERA LA QUE GEMINI DAÑÓ ============
 function downloadMediaWithYtDlp(url, outputPath, format = 'mp4') {
-    return new Promise((resolve, reject) => {
-        let flag = format === 'mp3' ? '-x --audio-format mp3' : '-f "b/bv+ba"';
-        const command = `yt-dlp --no-check-certificate --geo-bypass ${flag} -o "${outputPath}" "${url}"`;
-        
-        exec(command, { maxBuffer: 1024 * 1024 * 150 }, (error, stdout, stderr) => {
-            if (error) reject(error);
-            else fs.existsSync(outputPath) ? resolve(outputPath) : reject(new Error("El archivo no se generó."));
-        });
+    return new Promise(async (resolve, reject) => {
+        // 1. Si es link directo de video, bajarlo directo sin yt-dlp
+        const isDirect = /\.(mp4|webm|mov|mkv|m3u8|mp3)(\?|$)/i.test(url);
+        if (isDirect) {
+            exec(`curl -L -s -A "Mozilla/5.0" --max-time 120 -o "${outputPath}" "${url}"`, (err) => {
+                if (!err && fs.existsSync(outputPath) && fs.statSync(outputPath).size > 1000) {
+                    return resolve(outputPath);
+                }
+                // Si curl falla, sigue a yt-dlp
+                tryYtDlp();
+            });
+            return;
+        }
+        tryYtDlp();
+
+        function tryYtDlp() {
+            let flag = format === 'mp3'
+                ? '-x --audio-format mp3 --audio-quality 0'
+                : '-f "bv+ba/b" --merge-output-format mp4 --remux-video mp4';
+            
+            const command = `yt-dlp --no-check-certificate --geo-bypass --no-playlist --add-header "User-Agent:Mozilla/5.0" --add-header "Referer:${url}" ${flag} -o "${outputPath}" "${url}"`;
+            
+            exec(command, { maxBuffer: 1024 * 1024 * 500 }, (error) => {
+                if (fs.existsSync(outputPath)) return resolve(outputPath);
+                const files = fs.readdirSync('./').filter(f => f.startsWith('temp_dx_') || f.startsWith('temp_'));
+                if (files.length > 0) return resolve('./' + files[0]);
+                if (error) reject(error);
+                else reject(new Error("El archivo no se generó."));
+            });
+        }
     });
 }
 
@@ -355,7 +377,7 @@ async function connectToWhatsApp() {
                     }
                     break;
 
-                case 'fb':
+                                case 'fb':
                     if (!query || !query.startsWith('http')) {
                         await sock.sendMessage(from, { text: 'ℹ️ *Uso del comando .fb:*\n\nEscribe `.fb` seguido del enlace del video de Facebook.\n\n👉 Ejemplo: `.fb https://www.facebook.com/...`' }, { quoted: m });
                         break;
@@ -504,24 +526,39 @@ async function connectToWhatsApp() {
                     }
                     break;
 
+                // ============ DOWNLOADX CORREGIDO ============
                 case 'downloadx':
                     if (!nsfwStatus[from]) {
                         await sock.sendMessage(from, { text: '🔒 *Acceso Denegado:* Modo NSFW desactivado.' }, { quoted: m });
                         break;
                     }
                     if (!query || !query.startsWith('http')) {
-                        await sock.sendMessage(from, { text: 'ℹ️ *Uso del comando .downloadX:*\n\nEscribe `.downloadX` seguido del enlace adulto a descargar.\n\n👉 Ejemplo: `.downloadX https://sitio.com/video`' }, { quoted: m });
+                        await sock.sendMessage(from, { text: 'ℹ️ *Uso del comando .downloadX:*\n\nEscribe `.downloadX` seguido del enlace a descargar.\n\n👉 Ejemplo: `.downloadX https://sitio.com/video.mp4`' }, { quoted: m });
                         break;
                     }
                     await sock.sendMessage(from, { text: '📥 Descargando contenido...' }, { quoted: m });
                     const tempDx = `./temp_dx_${Date.now()}.mp4`;
                     try {
                         await downloadMediaWithYtDlp(query, tempDx, 'mp4');
-                        await sock.sendMessage(from, { video: fs.readFileSync(tempDx), mimetype: 'video/mp4', caption: '🔞 Video descargado.' }, { quoted: m });
+                        
+                        if (!fs.existsSync(tempDx) || fs.statSync(tempDx).size < 1000) throw new Error("Archivo vacío");
+                        
+                        const sizeMB = fs.statSync(tempDx).size / (1024 * 1024);
+                        if (sizeMB > 60) {
+                            await sock.sendMessage(from, { 
+                                document: fs.readFileSync(tempDx), 
+                                mimetype: 'video/mp4', 
+                                fileName: `video_${Date.now()}.mp4`, 
+                                caption: '🔞 Video descargado (como documento por peso).' 
+                            }, { quoted: m });
+                        } else {
+                            await sock.sendMessage(from, { video: fs.readFileSync(tempDx), mimetype: 'video/mp4', caption: '🔞 Video descargado.' }, { quoted: m });
+                        }
                         fs.unlinkSync(tempDx);
                     } catch (e) {
+                        console.log("Error downloadX:", e.message);
                         if (fs.existsSync(tempDx)) fs.unlinkSync(tempDx);
-                        await sock.sendMessage(from, { text: '❌ Error al procesar el enlace.' }, { quoted: m });
+                        await sock.sendMessage(from, { text: '❌ Error al procesar el enlace. Prueba con el link directo que termine en .mp4' }, { quoted: m });
                     }
                     break;
 
