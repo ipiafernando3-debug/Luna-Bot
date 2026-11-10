@@ -3,6 +3,7 @@ import pino from 'pino';
 import fs from 'fs';
 import { exec } from 'child_process';
 import readline from 'readline';
+import archiver from 'archiver'; // <-- Importación para generar el archivo ZIP
 
 const BOT_NAME = "Luna Bot";
 const BOT_VERSION = "1.1.7";
@@ -229,6 +230,7 @@ async function connectToWhatsApp() {
                                      `🔞 *NSFW & Acciones Adultas*\n` +
                                      `  • \`.nsfw on / off\`\n` +
                                      `  • \`.downloadX [enlace]\`\n` +
+                                     `  • \`.pack\` (Pack de 5 a 10 imágenes)\n` +
                                      `  • \`.trap\` | \`.blowjob\` | \`.cum\` | \`.nsfw_kiss\`\n\n` +
                                      `📢 *Canal Oficial*\n` +
                                      `  • ${CHANNEL_LINK}`;
@@ -415,10 +417,76 @@ async function connectToWhatsApp() {
                 case 'blowjob':
                 case 'cum':
                 case 'nsfw_kiss':
+                case 'pack':
                     if (!nsfwStatus[from]) {
                         await sock.sendMessage(from, { text: '🔒 *Acceso Denegado:* El modo NSFW está desactivado. Usa `.nsfw on` para activarlo.' }, { quoted: m });
                         break;
                     }
+
+                    if (command === 'pack') {
+                        await sock.sendMessage(from, { text: '📦 Generando pack NSFW (de 5 a 10 imágenes)... Por favor espera un momento.' }, { quoted: m });
+                        
+                        const timestamp = Date.now();
+                        const packDir = `./temp_pack_${timestamp}`;
+                        const zipPath = `./pack_${timestamp}.zip`;
+                        
+                        if (!fs.existsSync(packDir)) fs.mkdirSync(packDir);
+
+                        try {
+                            const count = Math.floor(Math.random() * 6) + 5; // Entre 5 y 10 imágenes
+                            const categories = ['waifu', 'neko', 'trap', 'blowjob'];
+                            let downloadedCount = 0;
+
+                            for (let i = 0; i < count; i++) {
+                                const randomCat = categories[Math.floor(Math.random() * categories.length)];
+                                const data = await safeFetchJson(`https://api.waifu.pics/nsfw/${randomCat}`);
+                                
+                                if (data && data.url) {
+                                    const imgPath = `${packDir}/img_${i + 1}.jpg`;
+                                    await new Promise((resolve) => {
+                                        exec(`curl -L -s -o "${imgPath}" "${data.url}"`, () => {
+                                            if (fs.existsSync(imgPath)) downloadedCount++;
+                                            resolve();
+                                        });
+                                    });
+                                }
+                            }
+
+                            if (downloadedCount < 3) {
+                                await sock.sendMessage(from, { text: '❌ No se pudieron descargar suficientes imágenes para el pack. Inténtalo de nuevo.' }, { quoted: m });
+                                break;
+                            }
+
+                            await new Promise((resolve, reject) => {
+                                const output = fs.createWriteStream(zipPath);
+                                const archive = archiver('zip', { zlib: { level: 9 } });
+
+                                output.on('close', () => resolve());
+                                archive.on('error', (err) => reject(err));
+
+                                archive.pipe(output);
+                                archive.directory(packDir, false);
+                                archive.finalize();
+                            });
+
+                            await sock.sendMessage(from, { 
+                                document: fs.readFileSync(zipPath), 
+                                mimetype: 'application/zip', 
+                                fileName: `Luna_NSFW_Pack_${downloadedCount}imgs.zip`, 
+                                caption: `🔞 ¡Aquí tienes tu pack NSFW con ${downloadedCount} imágenes exclusivas!` 
+                            }, { quoted: m });
+
+                        } catch (e) {
+                            await sock.sendMessage(from, { text: '❌ Ocurrió un error al empaquetar las imágenes.' }, { quoted: m });
+                        } finally {
+                            try {
+                                if (fs.existsSync(packDir)) fs.rmSync(packDir, { recursive: true, force: true });
+                                if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath);
+                            } catch (err) {}
+                        }
+                        break;
+                    }
+
                     const nsfwAction = command === 'nsfw_kiss' ? 'kiss' : command;
                     const targetNsfwUser = mentionedJid[0] ? `@${mentionedJid[0].split('@')[0]}` : 'alguien';
                     await sendGifAction(sock, from, m, nsfwAction, true, `🔞 Acción adulta *${command.toUpperCase()}* hacia${targetNsfwUser}.`, mentionedJid);
