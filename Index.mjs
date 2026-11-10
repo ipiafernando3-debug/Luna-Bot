@@ -7,7 +7,7 @@ import axios from 'axios';
 import AdmZip from 'adm-zip';
 
 const BOT_NAME = "Luna Bot";
-const BOT_VERSION = "1.1.7";
+const BOT_VERSION = "1.1.9";
 const BOT_OWNER = "Benjamin";
 // BOT_AVATAR corregido con enlace RAW de GitHub para que WhatsApp lo cargue bien
 const BOT_AVATAR = "https://raw.githubusercontent.com/ipiafernando3-debug/Luna-Bot/main/LunaBot.jpg"; 
